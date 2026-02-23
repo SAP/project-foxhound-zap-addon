@@ -16,13 +16,13 @@ zapAddOn {
     zapVersion.set("2.17.0")
     addOnStatus.set(AddOnStatus.ALPHA)
 
-    releaseLink.set("https://github.com/SAP/project-foxhound/compare/v@PREVIOUS_VERSION@...v@CURRENT_VERSION@")
-    unreleasedLink.set("https://github.com/SAP/project-foxhound/compare/v@CURRENT_VERSION@...HEAD")
+    releaseLink.set("https://github.com/SAP/project-foxhound-zap-addon/compare/v@PREVIOUS_VERSION@...v@CURRENT_VERSION@")
+    unreleasedLink.set("https://github.com/SAP/project-foxhound-zap-addon/compare/v@CURRENT_VERSION@...HEAD")
 
     manifest {
         author.set("Thomas Barber")
-        url.set("https://github.com/SAP/project-foxhound")
-        repo.set("https://github.com/SAP/project-foxhound")
+        url.set("https://github.com/SAP/project-foxhound-zap-addon")
+        repo.set("https://github.com/SAP/project-foxhound-zap-addon")
         changesFile.set(tasks.named<ConvertMarkdownToHtml>("generateManifestChanges").flatMap { it.html })
         // Don't search the add-on classes to prevent the inclusion
         // of the scanner, it's added/removed by the extension.
