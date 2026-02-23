@@ -19,8 +19,6 @@
  */
 package org.zaproxy.zap.extension.foxhound.config;
 
-import java.beans.PropertyChangeListener;
-import java.beans.PropertyChangeSupport;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.logging.log4j.LogManager;
@@ -53,8 +51,7 @@ public class FoxhoundOptions extends VersionedAbstractParam {
     private List<String> sourcesDisabled;
     private List<String> sinksDisabled;
 
-    public FoxhoundOptions() {
-    }
+    public FoxhoundOptions() {}
 
     @Override
     protected String getConfigVersionKey() {
@@ -116,5 +113,4 @@ public class FoxhoundOptions extends VersionedAbstractParam {
         this.sinksDisabled = disabled;
         getConfig().setProperty(SINKS_DISABLED_KEY, this.sinksDisabled);
     }
-
 }

@@ -48,15 +48,17 @@ public class TaintFlowTreeTable extends JXTreeTable {
     private TaintFlowTreeModel treeModel;
     private final DisplayMessageOnSelectionValueChange defaultSelectionListener;
 
+    @SuppressWarnings("this-escape")
     public TaintFlowTreeTable() {
         super();
+        this.defaultSelectionListener = new DisplayMessageOnSelectionValueChange();
+
         setColumnControlVisible(true);
         setTreeTableModel(getTreeModel());
         setTreeCellRenderer(new TaintFlowCellRenderer());
         TableRowSorter<TableModel> sorter = new TableRowSorter<TableModel>(getModel());
         setRowSorter(sorter);
 
-        this.defaultSelectionListener = new DisplayMessageOnSelectionValueChange();
         this.getTreeSelectionModel().addTreeSelectionListener(defaultSelectionListener);
 
         this.setAutoCreateRowSorter(true);

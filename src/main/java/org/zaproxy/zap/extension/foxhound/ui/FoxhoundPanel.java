@@ -86,7 +86,8 @@ public class FoxhoundPanel extends AbstractPanel implements EventConsumer {
     public void registerForEvents() {
         if (!eventsRegistered) {
             ZAP.getEventBus()
-                    .registerConsumer(this, FoxhoundEventPublisher.getPublisher().getPublisherName());
+                    .registerConsumer(
+                            this, FoxhoundEventPublisher.getPublisher().getPublisherName());
             eventsRegistered = true;
         }
     }
