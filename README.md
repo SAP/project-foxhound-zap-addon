@@ -1,4 +1,5 @@
 [![REUSE status](https://api.reuse.software/badge/github.com/SAP/project-foxhound-zap-addon)](https://api.reuse.software/info/github.com/SAP/project-foxhound-zap-addon)
+[![Java CI](https://github.com/SAP/project-foxhound-zap-addon/actions/workflows/ci.yml/badge.svg)](https://github.com/SAP/project-foxhound-zap-addon/actions/workflows/ci.yml)
 
 # Project Foxhound ZAP AddOn
 
