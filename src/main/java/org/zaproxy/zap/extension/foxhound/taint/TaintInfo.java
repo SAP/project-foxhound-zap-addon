@@ -38,6 +38,9 @@ public class TaintInfo implements SourceSinkProvider, TaintLocationProvider {
     private boolean subframe;
     private List<TaintRange> taintRanges;
 
+    // Original JSON from Foxhound for persistence
+    private transient String originalJson;
+
     // Derived Fields
     private TaintOperation sink;
     private Set<TaintOperation> sources;
@@ -167,6 +170,14 @@ public class TaintInfo implements SourceSinkProvider, TaintLocationProvider {
 
     public String getSourceSinkLabel() {
         return SourceSinkUtils.getSourceSinkLabel(this);
+    }
+
+    public String getOriginalJson() {
+        return originalJson;
+    }
+
+    public void setOriginalJson(String originalJson) {
+        this.originalJson = originalJson;
     }
 
     @Override

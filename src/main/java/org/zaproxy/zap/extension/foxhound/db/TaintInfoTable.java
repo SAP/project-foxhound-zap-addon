@@ -183,8 +183,14 @@ public class TaintInfoTable extends ParosAbstractTable {
             throw new IllegalArgumentException("TaintInfo cannot be null");
         }
 
-        // Serialize to JSON for storage
-        String json = serializeToJson(taintInfo);
+        // Use original JSON if available, otherwise create simplified version
+        String json = taintInfo.getOriginalJson();
+        if (json == null || json.isEmpty()) {
+            json = serializeToJson(taintInfo);
+            LOGGER.warn(
+                    "TaintInfo {} has no original JSON, using simplified serialization",
+                    taintInfo.getId());
+        }
 
         psInsertTaintInfo.setInt(1, taintInfo.getId());
         psInsertTaintInfo.setString(2, taintInfo.getStr());

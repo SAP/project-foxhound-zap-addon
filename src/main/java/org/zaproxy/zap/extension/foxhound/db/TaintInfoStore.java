@@ -76,8 +76,14 @@ public class TaintInfoStore {
 
             // Load max ID if possible
             loadMaxIdFromDb();
+
+            // Load existing data from database
+            loadFromDatabase();
+
             initialized = true;
-            LOGGER.info("TaintInfoStore initialized with database persistence");
+            LOGGER.info(
+                    "TaintInfoStore initialized with database persistence ({} items loaded)",
+                    memoryCache.size());
         } catch (Exception e) {
             LOGGER.error("Failed to initialize database, continuing with in-memory only mode", e);
             initialized = false;
@@ -251,6 +257,37 @@ public class TaintInfoStore {
         } catch (SQLException e) {
             LOGGER.warn("Failed to load max ID from database, starting from 0", e);
             nextId.set(0);
+        }
+    }
+
+    /** Load all TaintInfo objects from the database into the memory cache on startup. */
+    private void loadFromDatabase() {
+        try {
+            List<TaintInfo> allTaintInfos = dbTable.readAll();
+            LOGGER.info("Loading {} TaintInfo objects from database", allTaintInfos.size());
+
+            cacheLock.writeLock().lock();
+            try {
+                for (TaintInfo taintInfo : allTaintInfos) {
+                    // Load into cache (respecting cache size limit)
+                    if (memoryCache.size() >= maxCacheSize) {
+                        LOGGER.debug(
+                                "Cache full, stopped loading at {} items. Remaining items will be lazy-loaded.",
+                                memoryCache.size());
+                        break;
+                    }
+                    memoryCache.put(taintInfo.getId(), new CachedTaintInfo(taintInfo));
+                }
+            } finally {
+                cacheLock.writeLock().unlock();
+            }
+
+            LOGGER.info(
+                    "Loaded {} TaintInfo objects into cache ({} total in database)",
+                    memoryCache.size(),
+                    allTaintInfos.size());
+        } catch (SQLException e) {
+            LOGGER.error("Failed to load TaintInfo objects from database", e);
         }
     }
 
