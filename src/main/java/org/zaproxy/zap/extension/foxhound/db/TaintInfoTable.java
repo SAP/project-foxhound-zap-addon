@@ -73,8 +73,12 @@ public class TaintInfoTable extends ParosAbstractTable {
     @Override
     protected void reconnect(Connection conn) throws DatabaseException {
         try {
+            // Use provided connection for table creation
             createTables(conn);
-            prepareStatements(conn);
+
+            // Use managed connection for prepared statements that will persist
+            // This ensures CLOBs have proper database session context
+            prepareStatements(getConnection());
         } catch (SQLException e) {
             throw new DatabaseException("Failed to initialize TaintInfoTable", e);
         }
