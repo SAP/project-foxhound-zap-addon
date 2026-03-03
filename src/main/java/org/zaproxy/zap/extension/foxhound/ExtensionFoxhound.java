@@ -6,6 +6,9 @@ import org.apache.logging.log4j.Logger;
 import org.parosproxy.paros.Constant;
 import org.parosproxy.paros.control.Control;
 import org.parosproxy.paros.core.scanner.Alert;
+import org.parosproxy.paros.db.Database;
+import org.parosproxy.paros.db.DatabaseException;
+import org.parosproxy.paros.db.DatabaseUnsupportedException;
 import org.parosproxy.paros.extension.Extension;
 import org.parosproxy.paros.extension.ExtensionAdaptor;
 import org.parosproxy.paros.extension.ExtensionHook;
@@ -18,6 +21,7 @@ import org.zaproxy.zap.extension.foxhound.config.FoxhoundConstants;
 import org.zaproxy.zap.extension.foxhound.config.FoxhoundOptions;
 import org.zaproxy.zap.extension.foxhound.config.FoxhoundSeleniumProfile;
 import org.zaproxy.zap.extension.foxhound.db.TaintInfoStore;
+import org.zaproxy.zap.extension.foxhound.db.TaintInfoTable;
 import org.zaproxy.zap.extension.foxhound.ui.FoxhoundLaunchButton;
 import org.zaproxy.zap.extension.foxhound.ui.FoxhoundPanel;
 import org.zaproxy.zap.extension.foxhound.ui.FoxhoundScanStatus;
@@ -62,13 +66,13 @@ public class ExtensionFoxhound extends ExtensionAdaptor
     public void hook(ExtensionHook extensionHook) {
         super.hook(extensionHook);
 
-        // Initialize TaintInfoStore with database
-        getTaintStore().init(getModel().getDb());
+        // Initialize TaintInfoStore (database setup happens in databaseOpen())
+        getTaintStore().init();
 
         // Register as session listener
         extensionHook.addSessionListener(this);
 
-        // Initialize current session ID
+        // Initialize current session ID (if session already exists)
         if (getModel().getSession() != null) {
             long sessionId = getModel().getSession().getSessionId();
             getTaintStore().setCurrentSessionId(sessionId);
@@ -106,6 +110,26 @@ public class ExtensionFoxhound extends ExtensionAdaptor
                 "Starting the Foxhound ZAP extension with {} sources and {} sinks.",
                 FoxhoundConstants.ALL_SOURCES.size(),
                 FoxhoundConstants.ALL_SINKS.size());
+    }
+
+    @Override
+    public void databaseOpen(Database database)
+            throws DatabaseException, DatabaseUnsupportedException {
+        // Initialize the TaintInfoStore with database
+        TaintInfoStore store = getTaintStore();
+
+        // Get the table and register it as a database listener
+        TaintInfoTable table = store.getTable();
+        database.addDatabaseListener(table);
+
+        // Explicitly trigger databaseOpen on the table to create tables
+        table.databaseOpen(database.getDatabaseServer());
+
+        // Load max ID and existing data
+        store.loadMaxIdFromDb();
+        store.loadFromDatabase();
+
+        LOGGER.info("Database initialized with TaintInfo tables");
     }
 
     @Override

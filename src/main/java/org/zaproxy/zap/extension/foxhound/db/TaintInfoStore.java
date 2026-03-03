@@ -28,8 +28,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.parosproxy.paros.db.Database;
-import org.parosproxy.paros.db.DatabaseListener;
 import org.zaproxy.zap.extension.foxhound.FoxhoundEventPublisher;
 import org.zaproxy.zap.extension.foxhound.taint.TaintDeserializer;
 import org.zaproxy.zap.extension.foxhound.taint.TaintInfo;
@@ -42,7 +40,7 @@ import org.zaproxy.zap.extension.foxhound.taint.TaintInfo;
  * <p>All additions are immediately persisted to the database (write-through cache). Items are
  * loaded from the database on-demand when not in the memory cache.
  */
-public class TaintInfoStore implements DatabaseListener {
+public class TaintInfoStore {
     private static final Logger LOGGER = LogManager.getLogger(TaintInfoStore.class);
     private static final int DEFAULT_CACHE_SIZE = 1000;
 
@@ -65,26 +63,19 @@ public class TaintInfoStore implements DatabaseListener {
     }
 
     /**
-     * Initialize the database and prepare the store for use.
+     * Get the database table instance.
      *
-     * @param database The ZAP Database instance
+     * @return The TaintInfoTable
      */
-    public void init(Database database) {
-        try {
-            // Register the table as a database listener
-            // The reconnect() callback will be triggered automatically by ZAP's database framework
-            // when the database connection is established
-            database.addDatabaseListener(dbTable);
+    public TaintInfoTable getTable() {
+        return dbTable;
+    }
 
-            // Also register this store as a listener to load data after the table is initialized
-            database.addDatabaseListener(this);
-
-            initialized = true;
-            LOGGER.info("TaintInfoStore initialized with database persistence");
-        } catch (Exception e) {
-            LOGGER.error("Failed to initialize database, continuing with in-memory only mode", e);
-            initialized = false;
-        }
+    /** Initialize the store for use. */
+    public void init() {
+        initialized = true;
+        LOGGER.info(
+                "TaintInfoStore initialized (database setup will occur in extension's databaseOpen())");
     }
 
     /**
@@ -364,7 +355,7 @@ public class TaintInfoStore implements DatabaseListener {
     }
 
     /** Load the maximum ID from database to continue ID sequence. */
-    private void loadMaxIdFromDb() {
+    public void loadMaxIdFromDb() {
         try {
             int maxId = dbTable.getMaxId();
             nextId.set(maxId + 1);
@@ -376,7 +367,7 @@ public class TaintInfoStore implements DatabaseListener {
     }
 
     /** Load all TaintInfo objects from the database into the memory cache on startup. */
-    private void loadFromDatabase() {
+    public void loadFromDatabase() {
         try {
             List<TaintInfo> allTaintInfos = dbTable.readAll();
             LOGGER.info("Loading {} TaintInfo objects from database", allTaintInfos.size());
@@ -441,21 +432,5 @@ public class TaintInfoStore implements DatabaseListener {
      */
     private List<TaintInfo> fallbackMemoryFilter(TaintInfoFilter filter) {
         return fallbackMemoryFilter(filter, -1);
-    }
-
-    // DatabaseListener implementation
-
-    @Override
-    public void databaseOpen(org.parosproxy.paros.db.DatabaseServer dbServer) {
-        // Database is now ready, load existing data
-        if (initialized && dbTable.isInitialized()) {
-            try {
-                loadMaxIdFromDb();
-                loadFromDatabase();
-                LOGGER.info("Loaded {} items from database into cache", memoryCache.size());
-            } catch (Exception e) {
-                LOGGER.error("Failed to load data from database", e);
-            }
-        }
     }
 }
