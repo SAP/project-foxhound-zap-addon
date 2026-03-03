@@ -98,13 +98,18 @@ public class TaintInfoStore implements DatabaseListener {
             }
 
             // Persist to database (write-through cache)
-            if (initialized) {
+            // Only attempt if both initialized and table is ready (reconnect has been called)
+            if (initialized && dbTable.isInitialized()) {
                 try {
                     dbTable.insert(taintInfo);
                 } catch (SQLException e) {
                     LOGGER.error("Failed to persist TaintInfo to database", e);
                     // Continue with memory cache even if DB fails (graceful degradation)
                 }
+            } else if (initialized && !dbTable.isInitialized()) {
+                LOGGER.debug(
+                        "Database not yet ready, storing TaintInfo {} in memory only",
+                        taintInfo.getId());
             }
 
             // Add to memory cache
@@ -126,7 +131,7 @@ public class TaintInfoStore implements DatabaseListener {
     /** Clear all TaintInfo from both memory cache and database. */
     public void clearAll() {
         // Clear database
-        if (initialized) {
+        if (initialized && dbTable.isInitialized()) {
             try {
                 dbTable.deleteAll();
             } catch (SQLException e) {
@@ -164,7 +169,7 @@ public class TaintInfoStore implements DatabaseListener {
         }
 
         // Not in cache, try loading from database
-        if (initialized) {
+        if (initialized && dbTable.isInitialized()) {
             try {
                 TaintInfo fromDb = dbTable.read(id);
                 if (fromDb != null) {
@@ -193,7 +198,7 @@ public class TaintInfoStore implements DatabaseListener {
      * @return List of matching TaintInfo objects
      */
     public List<TaintInfo> getFilteredTaintInfos(TaintInfoFilter filter) {
-        if (initialized) {
+        if (initialized && dbTable.isInitialized()) {
             try {
                 // Use database query for filtering
                 return dbTable.readFiltered(filter);
