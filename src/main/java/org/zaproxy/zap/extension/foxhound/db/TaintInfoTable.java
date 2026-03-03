@@ -73,14 +73,38 @@ public class TaintInfoTable extends ParosAbstractTable {
     @Override
     protected void reconnect(Connection conn) throws DatabaseException {
         try {
+            // Close old prepared statements if they exist
+            closeStatements();
+
             // Use provided connection for table creation
             createTables(conn);
 
-            // Use managed connection for prepared statements that will persist
-            // This ensures CLOBs have proper database session context
-            prepareStatements(getConnection());
+            // Prepare statements with the same connection
+            // The connection will be managed by the parent class
+            prepareStatements(conn);
         } catch (SQLException e) {
             throw new DatabaseException("Failed to initialize TaintInfoTable", e);
+        }
+    }
+
+    /** Close all prepared statements. */
+    private void closeStatements() {
+        try {
+            if (psInsertTaintInfo != null) psInsertTaintInfo.close();
+            if (psInsertOperation != null) psInsertOperation.close();
+            if (psInsertRange != null) psInsertRange.close();
+            if (psInsertFlow != null) psInsertFlow.close();
+            if (psSelectById != null) psSelectById.close();
+            if (psSelectAllIds != null) psSelectAllIds.close();
+            if (psDeleteAll != null) psDeleteAll.close();
+            if (psGetMaxId != null) psGetMaxId.close();
+            if (psSelectOperations != null) psSelectOperations.close();
+            if (psSelectRanges != null) psSelectRanges.close();
+            if (psSelectFlow != null) psSelectFlow.close();
+            if (psSelectBySession != null) psSelectBySession.close();
+            if (psDeleteBySession != null) psDeleteBySession.close();
+        } catch (SQLException e) {
+            LOGGER.warn("Error closing prepared statements", e);
         }
     }
 
