@@ -211,12 +211,24 @@ public class ExtensionFoxhound extends ExtensionAdaptor
 
     @Override
     public void sessionAboutToChange(Session session) {
-        LOGGER.info(
-                "Session about to change. Clearing taint data for session: {}",
-                session != null ? session.getSessionId() : "null");
+        // Only clear cache when actually switching sessions, not when saving
+        // When saving, session is null or same as current
+        long oldSessionId = session != null ? session.getSessionId() : -1;
+        long currentSessionId = getTaintStore().getCurrentSessionId();
 
-        // Clear memory cache (database records preserved)
-        getTaintStore().clearMemoryCache();
+        if (oldSessionId > 0 && oldSessionId != currentSessionId) {
+            // Actual session switch - clear cache for the OLD session
+            LOGGER.info(
+                    "Session switching from {} to different session. Clearing taint data.",
+                    oldSessionId);
+            getTaintStore().clearMemoryCache();
+        } else {
+            // Session save or same session - don't clear
+            LOGGER.info(
+                    "Session persisting (not switching). Preserving taint data. Old: {}, Current: {}",
+                    oldSessionId,
+                    currentSessionId);
+        }
     }
 
     @Override
