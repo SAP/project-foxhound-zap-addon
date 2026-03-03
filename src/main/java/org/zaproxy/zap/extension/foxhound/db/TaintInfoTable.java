@@ -93,6 +93,15 @@ public class TaintInfoTable extends ParosAbstractTable {
         return super.getConnection();
     }
 
+    /**
+     * Check if the table has been initialized (reconnect has been called).
+     *
+     * @return true if prepared statements are ready
+     */
+    public boolean isInitialized() {
+        return psInsertTaintInfo != null;
+    }
+
     /** Create all normalized tables if they don't exist. */
     private void createTables(Connection conn) throws SQLException {
         Statement stmt = conn.createStatement();
