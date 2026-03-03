@@ -88,6 +88,108 @@ public class TaintInfoStore implements DatabaseListener {
     }
 
     /**
+     * Set the current session ID for new taint flows.
+     *
+     * @param sessionId The session ID
+     */
+    public void setCurrentSessionId(long sessionId) {
+        synchronized (sessionLock) {
+            this.currentSessionId = sessionId;
+            LOGGER.info("Session ID updated to: {}", sessionId);
+        }
+    }
+
+    /**
+     * Get the current session ID.
+     *
+     * @return The current session ID
+     */
+    public long getCurrentSessionId() {
+        synchronized (sessionLock) {
+            return currentSessionId;
+        }
+    }
+
+    /** Clear the memory cache. Database records are preserved. */
+    public void clearMemoryCache() {
+        cacheLock.writeLock().lock();
+        try {
+            int size = memoryCache.size();
+            memoryCache.clear();
+            LOGGER.info("Cleared {} TaintInfo objects from memory cache", size);
+        } finally {
+            cacheLock.writeLock().unlock();
+        }
+        FoxhoundEventPublisher.publishClearEvent();
+    }
+
+    /**
+     * Clear all taint info for a specific session from both memory and database.
+     *
+     * @param sessionId The session ID to clear
+     */
+    public void clearSession(long sessionId) {
+        // Clear from database
+        if (initialized && dbTable.isInitialized()) {
+            try {
+                dbTable.deleteBySession(sessionId);
+                LOGGER.info("Cleared session {} from database", sessionId);
+            } catch (SQLException e) {
+                LOGGER.error("Failed to clear session {} from database", sessionId, e);
+            }
+        }
+
+        // Clear matching items from memory cache
+        cacheLock.writeLock().lock();
+        try {
+            int removed = 0;
+            memoryCache
+                    .entrySet()
+                    .removeIf(
+                            entry -> {
+                                if (entry.getValue().getTaintInfo().getSessionId() == sessionId) {
+                                    return true;
+                                }
+                                return false;
+                            });
+            if (removed > 0) {
+                LOGGER.info(
+                        "Cleared {} TaintInfo objects for session {} from memory",
+                        removed,
+                        sessionId);
+            }
+        } finally {
+            cacheLock.writeLock().unlock();
+        }
+
+        FoxhoundEventPublisher.publishClearEvent();
+    }
+
+    /**
+     * Get all taint infos for the current session.
+     *
+     * @return List of TaintInfo objects for the current session
+     */
+    public List<TaintInfo> getTaintInfosForCurrentSession() {
+        long sessionId = getCurrentSessionId();
+        if (sessionId <= 0) {
+            LOGGER.warn("No valid current session");
+            return new ArrayList<>();
+        }
+
+        if (initialized && dbTable.isInitialized()) {
+            try {
+                return dbTable.readBySession(sessionId);
+            } catch (SQLException e) {
+                LOGGER.error("Failed to read TaintInfo for session {}", sessionId, e);
+            }
+        }
+
+        // Fallback to memory cache
+        return fallbackMemoryFilter(new TaintInfoFilter(), sessionId);
+    }
+
+    /**
      * Add a TaintInfo to the store. Immediately persists to database and adds to memory cache.
      *
      * @param taintInfo The TaintInfo to add
@@ -97,6 +199,14 @@ public class TaintInfoStore implements DatabaseListener {
             // Assign ID if needed
             if (taintInfo.getId() < 0) {
                 taintInfo.setId(nextId.getAndIncrement());
+            }
+
+            // Assign current session ID
+            long sessionId = getCurrentSessionId();
+            taintInfo.setSessionId(sessionId);
+
+            if (sessionId <= 0) {
+                LOGGER.warn("TaintInfo {} captured without valid session", taintInfo.getId());
             }
 
             // Persist to database (write-through cache)
@@ -297,14 +407,19 @@ public class TaintInfoStore implements DatabaseListener {
      * Fallback method to filter from memory cache when database query fails.
      *
      * @param filter The filter to apply
+     * @param sessionId The session ID to filter by (0 or negative means no session filter)
      * @return List of matching TaintInfo objects from memory
      */
-    private List<TaintInfo> fallbackMemoryFilter(TaintInfoFilter filter) {
+    private List<TaintInfo> fallbackMemoryFilter(TaintInfoFilter filter, long sessionId) {
         List<TaintInfo> filteredList = new ArrayList<>();
         cacheLock.readLock().lock();
         try {
             for (CachedTaintInfo cached : memoryCache.values()) {
                 TaintInfo info = cached.getTaintInfo();
+                // Filter by session ID first
+                if (sessionId > 0 && info.getSessionId() != sessionId) {
+                    continue;
+                }
                 if (filter.matches(info)) {
                     filteredList.add(info);
                 }
@@ -313,6 +428,16 @@ public class TaintInfoStore implements DatabaseListener {
             cacheLock.readLock().unlock();
         }
         return filteredList;
+    }
+
+    /**
+     * Fallback method to filter from memory cache when database query fails.
+     *
+     * @param filter The filter to apply
+     * @return List of matching TaintInfo objects from memory
+     */
+    private List<TaintInfo> fallbackMemoryFilter(TaintInfoFilter filter) {
+        return fallbackMemoryFilter(filter, -1);
     }
 
     // DatabaseListener implementation

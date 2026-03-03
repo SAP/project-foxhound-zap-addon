@@ -62,6 +62,8 @@ public class TaintInfoTable extends ParosAbstractTable {
     private PreparedStatement psSelectOperations;
     private PreparedStatement psSelectRanges;
     private PreparedStatement psSelectFlow;
+    private PreparedStatement psSelectBySession;
+    private PreparedStatement psDeleteBySession;
 
     // For testing - allows direct connection access
     private Connection testConnection;
@@ -112,7 +114,7 @@ public class TaintInfoTable extends ParosAbstractTable {
                             + TABLE_TAINT_INFO
                             + " ("
                             + "taint_id INTEGER PRIMARY KEY, "
-                            + "session_id BIGINT NOT NULL DEFAULT -1, "
+                            + "session_id BIGINT NOT NULL, "
                             + "str CLOB(16777216), "
                             + "location VARCHAR(2048), "
                             + "parent_location VARCHAR(2048), "
@@ -276,6 +278,13 @@ public class TaintInfoTable extends ParosAbstractTable {
                         "SELECT * FROM "
                                 + TABLE_TAINT_FLOW
                                 + " WHERE range_id = ? ORDER BY flow_order");
+
+        psSelectBySession =
+                conn.prepareStatement(
+                        "SELECT taint_id FROM " + TABLE_TAINT_INFO + " WHERE session_id = ?");
+
+        psDeleteBySession =
+                conn.prepareStatement("DELETE FROM " + TABLE_TAINT_INFO + " WHERE session_id = ?");
 
         LOGGER.debug("Prepared statements created successfully");
     }
@@ -635,5 +644,44 @@ public class TaintInfoTable extends ParosAbstractTable {
         } finally {
             rs.close();
         }
+    }
+
+    /**
+     * Read all taint infos for a specific session.
+     *
+     * @param sessionId The session ID to filter by
+     * @return List of TaintInfo objects for the session
+     */
+    public synchronized List<TaintInfo> readBySession(long sessionId) throws SQLException {
+        List<TaintInfo> results = new ArrayList<>();
+
+        psSelectBySession.setLong(1, sessionId);
+        ResultSet rs = psSelectBySession.executeQuery();
+
+        try {
+            while (rs.next()) {
+                int taintId = rs.getInt("taint_id");
+                TaintInfo taintInfo = read(taintId);
+                if (taintInfo != null) {
+                    results.add(taintInfo);
+                }
+            }
+        } finally {
+            rs.close();
+        }
+
+        LOGGER.debug("Read {} TaintInfo records for session {}", results.size(), sessionId);
+        return results;
+    }
+
+    /**
+     * Delete all taint infos for a specific session.
+     *
+     * @param sessionId The session ID to delete
+     */
+    public synchronized void deleteBySession(long sessionId) throws SQLException {
+        psDeleteBySession.setLong(1, sessionId);
+        int count = psDeleteBySession.executeUpdate();
+        LOGGER.debug("Deleted {} TaintInfo records for session {}", count, sessionId);
     }
 }
