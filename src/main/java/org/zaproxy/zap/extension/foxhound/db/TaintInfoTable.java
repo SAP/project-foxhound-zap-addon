@@ -166,7 +166,7 @@ public class TaintInfoTable extends ParosAbstractTable {
                             + "taint_id INTEGER NOT NULL, "
                             + "begin_pos INTEGER, "
                             + "end_pos INTEGER, "
-                            + "substring VARCHAR(4096), "
+                            + "substring CLOB(16777216), "
                             + "FOREIGN KEY (taint_id) REFERENCES "
                             + TABLE_TAINT_INFO
                             + "(taint_id) ON DELETE CASCADE"
