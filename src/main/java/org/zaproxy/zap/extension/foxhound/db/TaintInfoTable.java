@@ -81,8 +81,9 @@ public class TaintInfoTable extends ParosAbstractTable {
     }
 
     /**
-     * Override getConnection to support testing with direct connection injection.
-     * In tests, testConnection will be set by reconnect(). In production, it will use parent's getConnection().
+     * Override getConnection to support testing with direct connection injection. In tests,
+     * testConnection will be set by reconnect(). In production, it will use parent's
+     * getConnection().
      */
     @Override
     protected Connection getConnection() throws DatabaseException {
