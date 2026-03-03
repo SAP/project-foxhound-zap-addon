@@ -51,7 +51,11 @@ The built add-on file will be in: `build/zapAddOn/bin/`
 
 1. **FoxhoundExportServer** - HTTP server (default port configured in FoxhoundOptions) that receives taint flow data from Foxhound browser instances via POST requests
 2. **TaintDeserializer** - Parses JSON taint flow data from Foxhound into TaintInfo objects
-3. **TaintInfoStore** - In-memory concurrent storage for taint flows, publishes events when taint info is added
+3. **TaintInfoStore** - Persistent storage for taint flows with two-tier architecture:
+   - **Tier 1**: Hot LRU cache in memory (default 1000 entries, configurable)
+   - **Tier 2**: Complete dataset in HSQLDB for persistence across sessions
+   - Write-through cache: All additions immediately persisted to database
+   - Lazy loading: Items loaded from database on-demand when not in cache
 4. **FoxhoundAlertHelper** - Event consumer that analyzes taint flows and raises ZAP alerts based on vulnerability checks
 5. **FoxhoundPanel** - UI panel displaying taint flows in a tree table structure
 
@@ -98,11 +102,35 @@ Uses ZAP's EventBus for decoupled communication:
 - Writes user.js with tainting preferences based on FoxhoundOptions
 - Sets export URL to point to FoxhoundExportServer
 
+### Database Persistence
+
+**TaintInfoTable** extends ParosAbstractTable to persist taint flows using normalized SQL tables:
+- **Schema**: 4 tables (TAINT_INFO, TAINT_OPERATION, TAINT_RANGE, TAINT_FLOW)
+- **Foreign keys**: CASCADE DELETE maintains referential integrity
+- **Indexes**: Optimized for timestamp, sink name, and operation queries
+- **Serialization**: Pure SQL storage (no JSON) - all TaintInfo fields stored in normalized relational tables
+
+**TaintInfoStore** implements DatabaseListener for lifecycle management:
+- `init()`: Registers table and store as database listeners
+- `databaseOpen()`: Loads max ID and existing data after database is ready
+- Gracefully degrades to in-memory mode if database unavailable
+- LRU eviction when cache size exceeds `foxhound.taint.cacheSize` (default 1000)
+
+**Implementation Details**:
+- Write-through cache: All adds immediately persisted via `TaintInfoTable.insert()`
+- Lazy loading: Cache misses trigger `TaintInfoTable.read()` from database
+- Transaction support: Inserts use commit/rollback for data integrity
+- Testing: `testConnection` field enables unit testing outside ZAP infrastructure
+
 ## Key Package Structure
 
 - `alerts/` - Vulnerability check implementations
 - `config/` - Configuration, constants, Selenium profile management
-- `db/` - TaintInfoStore and filtering
+- `db/` - Database persistence layer:
+  - `TaintInfoTable.java` - ParosAbstractTable implementation with normalized SQL schema
+  - `TaintInfoStore.java` - LRU cache + database storage with DatabaseListener integration
+  - `TaintInfoFilter.java` - Filtering logic for queries
+  - `CachedTaintInfo.java` - LRU cache entry wrapper with access time tracking
 - `taint/` - Core taint flow data model and deserialization
 - `ui/` - Swing UI components for displaying taint flows
 
@@ -112,6 +140,35 @@ Tests use JUnit 5 (Jupiter). Single test execution:
 ```bash
 ./gradlew test --tests SourceAndSinkTypeTest
 ```
+
+Database tests:
+- `TaintInfoTableTest` - Tests normalized SQL table operations (12 tests)
+- `TaintInfoStoreTest` - Tests caching and store behavior (13 tests)
+- Tests use in-memory HSQLDB for isolation
+- `TaintInfoTable.testConnection` enables testing outside ZAP infrastructure
+
+## Important Implementation Patterns
+
+### Database Lifecycle
+1. **Initialization**: `ExtensionFoxhound.hook()` calls `TaintInfoStore.init(Database)`
+2. **Registration**: Store registers both `TaintInfoTable` and itself as database listeners
+3. **Reconnect**: ZAP calls `TaintInfoTable.reconnect(Connection)` to create tables and prepare statements
+4. **Data Loading**: ZAP calls `TaintInfoStore.databaseOpen(DatabaseServer)` to load persisted data
+5. **Graceful Degradation**: If database unavailable, store operates in memory-only mode
+
+### Adding New Database Fields
+To add a new field to TaintInfo persistence:
+1. Add column to CREATE TABLE statement in `TaintInfoTable.createTables()`
+2. Update INSERT statement in `prepareStatements()`
+3. Add setter in `TaintInfoTable.insert()` method
+4. Add getter in `TaintInfoTable.read()` method
+5. Update tests to include new field
+
+### LRU Cache Tuning
+Configure cache size in `FoxhoundOptions`:
+- Default: 1000 entries
+- Property key: `foxhound.taint.cacheSize`
+- Eviction: Least recently accessed items removed when cache exceeds max size
 
 ## ZAP Add-on Specifics
 
