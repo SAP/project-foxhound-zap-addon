@@ -25,33 +25,43 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
-import net.sf.json.JSONObject;
+import java.util.Map;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.parosproxy.paros.db.DatabaseException;
 import org.parosproxy.paros.db.paros.ParosAbstractTable;
-import org.zaproxy.zap.extension.foxhound.taint.TaintDeserializer;
 import org.zaproxy.zap.extension.foxhound.taint.TaintInfo;
+import org.zaproxy.zap.extension.foxhound.taint.TaintLocation;
+import org.zaproxy.zap.extension.foxhound.taint.TaintOperation;
+import org.zaproxy.zap.extension.foxhound.taint.TaintRange;
 
 /**
- * Database table for persisting TaintInfo objects. Extends ParosAbstractTable to integrate with
- * ZAP's database infrastructure.
+ * Database table for persisting TaintInfo objects using normalized SQL tables. Extends
+ * ParosAbstractTable to integrate with ZAP's database infrastructure.
  */
 public class TaintInfoTable extends ParosAbstractTable {
     private static final Logger LOGGER = LogManager.getLogger(TaintInfoTable.class);
 
-    // Table name
+    // Table names
     private static final String TABLE_TAINT_INFO = "TAINT_INFO";
+    private static final String TABLE_TAINT_OPERATION = "TAINT_OPERATION";
+    private static final String TABLE_TAINT_RANGE = "TAINT_RANGE";
+    private static final String TABLE_TAINT_FLOW = "TAINT_FLOW";
 
     // Prepared statements
     private PreparedStatement psInsertTaintInfo;
+    private PreparedStatement psInsertOperation;
+    private PreparedStatement psInsertRange;
+    private PreparedStatement psInsertFlow;
     private PreparedStatement psSelectById;
-    private PreparedStatement psSelectAll;
+    private PreparedStatement psSelectAllIds;
     private PreparedStatement psDeleteAll;
     private PreparedStatement psGetMaxId;
-    private PreparedStatement psSelectBySinkName;
-    private PreparedStatement psSelectByTimestamp;
+    private PreparedStatement psSelectOperations;
+    private PreparedStatement psSelectRanges;
+    private PreparedStatement psSelectFlow;
 
     public TaintInfoTable() {}
 
@@ -65,16 +75,11 @@ public class TaintInfoTable extends ParosAbstractTable {
         }
     }
 
-    /**
-     * Create the TAINT_INFO table if it doesn't exist.
-     *
-     * @param conn Database connection
-     * @throws SQLException if table creation fails
-     */
+    /** Create all normalized tables if they don't exist. */
     private void createTables(Connection conn) throws SQLException {
         Statement stmt = conn.createStatement();
         try {
-            // Main table with original JSON for fidelity
+            // Main TaintInfo table
             stmt.execute(
                     "CREATE CACHED TABLE IF NOT EXISTS "
                             + TABLE_TAINT_INFO
@@ -87,11 +92,66 @@ public class TaintInfoTable extends ParosAbstractTable {
                             + "sink_name VARCHAR(255), "
                             + "time_stamp BIGINT, "
                             + "cookie VARCHAR(1024), "
-                            + "subframe BOOLEAN, "
-                            + "original_json CLOB(16777216)"
+                            + "subframe BOOLEAN"
                             + ")");
 
-            // Create indexes for common query patterns
+            // TaintOperation table (stores all operations - sources and sinks)
+            stmt.execute(
+                    "CREATE CACHED TABLE IF NOT EXISTS "
+                            + TABLE_TAINT_OPERATION
+                            + " ("
+                            + "operation_id INTEGER IDENTITY PRIMARY KEY, "
+                            + "taint_id INTEGER NOT NULL, "
+                            + "range_id INTEGER, "
+                            + "operation VARCHAR(255), "
+                            + "is_source BOOLEAN, "
+                            + "is_sink BOOLEAN, "
+                            + "filename VARCHAR(2048), "
+                            + "function VARCHAR(512), "
+                            + "line INTEGER, "
+                            + "pos INTEGER, "
+                            + "next_line INTEGER, "
+                            + "next_pos INTEGER, "
+                            + "script_line INTEGER, "
+                            + "md5 VARCHAR(32), "
+                            + "FOREIGN KEY (taint_id) REFERENCES "
+                            + TABLE_TAINT_INFO
+                            + "(taint_id) ON DELETE CASCADE"
+                            + ")");
+
+            // TaintRange table
+            stmt.execute(
+                    "CREATE CACHED TABLE IF NOT EXISTS "
+                            + TABLE_TAINT_RANGE
+                            + " ("
+                            + "range_id INTEGER IDENTITY PRIMARY KEY, "
+                            + "taint_id INTEGER NOT NULL, "
+                            + "begin_pos INTEGER, "
+                            + "end_pos INTEGER, "
+                            + "substring VARCHAR(4096), "
+                            + "FOREIGN KEY (taint_id) REFERENCES "
+                            + TABLE_TAINT_INFO
+                            + "(taint_id) ON DELETE CASCADE"
+                            + ")");
+
+            // TaintFlow table (flow chain ordering)
+            stmt.execute(
+                    "CREATE CACHED TABLE IF NOT EXISTS "
+                            + TABLE_TAINT_FLOW
+                            + " ("
+                            + "flow_id INTEGER IDENTITY PRIMARY KEY, "
+                            + "range_id INTEGER NOT NULL, "
+                            + "operation_id INTEGER NOT NULL, "
+                            + "flow_order INTEGER NOT NULL, "
+                            + "FOREIGN KEY (range_id) REFERENCES "
+                            + TABLE_TAINT_RANGE
+                            + "(range_id) ON DELETE CASCADE, "
+                            + "FOREIGN KEY (operation_id) REFERENCES "
+                            + TABLE_TAINT_OPERATION
+                            + "(operation_id) ON DELETE CASCADE"
+                            + ")");
+
+            // Create indexes
             stmt.execute(
                     "CREATE INDEX IF NOT EXISTS IDX_TAINT_TIMESTAMP ON "
                             + TABLE_TAINT_INFO
@@ -100,160 +160,399 @@ public class TaintInfoTable extends ParosAbstractTable {
                     "CREATE INDEX IF NOT EXISTS IDX_TAINT_SINK_NAME ON "
                             + TABLE_TAINT_INFO
                             + "(sink_name)");
+            stmt.execute(
+                    "CREATE INDEX IF NOT EXISTS IDX_OP_TAINT ON "
+                            + TABLE_TAINT_OPERATION
+                            + "(taint_id)");
+            stmt.execute(
+                    "CREATE INDEX IF NOT EXISTS IDX_OP_RANGE ON "
+                            + TABLE_TAINT_OPERATION
+                            + "(range_id)");
+            stmt.execute(
+                    "CREATE INDEX IF NOT EXISTS IDX_RANGE_TAINT ON "
+                            + TABLE_TAINT_RANGE
+                            + "(taint_id)");
+            stmt.execute(
+                    "CREATE INDEX IF NOT EXISTS IDX_FLOW_RANGE ON "
+                            + TABLE_TAINT_FLOW
+                            + "(range_id)");
 
-            LOGGER.debug("TaintInfoTable created successfully");
+            LOGGER.debug("TaintInfo normalized tables created successfully");
         } finally {
             stmt.close();
         }
     }
 
-    /**
-     * Prepare all SQL statements for reuse.
-     *
-     * @param conn Database connection
-     * @throws SQLException if statement preparation fails
-     */
+    /** Prepare all SQL statements for reuse. */
     private void prepareStatements(Connection conn) throws SQLException {
         psInsertTaintInfo =
                 conn.prepareStatement(
                         "INSERT INTO "
                                 + TABLE_TAINT_INFO
                                 + " (taint_id, str, location, parent_location, referrer, sink_name, "
-                                + "time_stamp, cookie, subframe, original_json) "
-                                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                                + "time_stamp, cookie, subframe) "
+                                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+
+        psInsertOperation =
+                conn.prepareStatement(
+                        "INSERT INTO "
+                                + TABLE_TAINT_OPERATION
+                                + " (taint_id, range_id, operation, is_source, is_sink, "
+                                + "filename, function, line, pos, next_line, next_pos, script_line, md5) "
+                                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+
+        psInsertRange =
+                conn.prepareStatement(
+                        "INSERT INTO "
+                                + TABLE_TAINT_RANGE
+                                + " (taint_id, begin_pos, end_pos, substring) "
+                                + "VALUES (?, ?, ?, ?)",
+                        Statement.RETURN_GENERATED_KEYS);
+
+        psInsertFlow =
+                conn.prepareStatement(
+                        "INSERT INTO "
+                                + TABLE_TAINT_FLOW
+                                + " (range_id, operation_id, flow_order) "
+                                + "VALUES (?, ?, ?)");
 
         psSelectById =
-                conn.prepareStatement(
-                        "SELECT original_json FROM " + TABLE_TAINT_INFO + " WHERE taint_id = ?");
+                conn.prepareStatement("SELECT * FROM " + TABLE_TAINT_INFO + " WHERE taint_id = ?");
 
-        psSelectAll = conn.prepareStatement("SELECT original_json FROM " + TABLE_TAINT_INFO);
+        psSelectAllIds = conn.prepareStatement("SELECT taint_id FROM " + TABLE_TAINT_INFO);
 
         psDeleteAll = conn.prepareStatement("DELETE FROM " + TABLE_TAINT_INFO);
 
         psGetMaxId =
                 conn.prepareStatement("SELECT MAX(taint_id) AS max_id FROM " + TABLE_TAINT_INFO);
 
-        psSelectBySinkName =
+        psSelectOperations =
                 conn.prepareStatement(
-                        "SELECT original_json FROM " + TABLE_TAINT_INFO + " WHERE sink_name = ?");
+                        "SELECT * FROM "
+                                + TABLE_TAINT_OPERATION
+                                + " WHERE taint_id = ? ORDER BY operation_id");
 
-        psSelectByTimestamp =
+        psSelectRanges =
                 conn.prepareStatement(
-                        "SELECT original_json FROM "
-                                + TABLE_TAINT_INFO
-                                + " WHERE time_stamp >= ? AND time_stamp <= ?");
+                        "SELECT * FROM "
+                                + TABLE_TAINT_RANGE
+                                + " WHERE taint_id = ? ORDER BY range_id");
+
+        psSelectFlow =
+                conn.prepareStatement(
+                        "SELECT * FROM "
+                                + TABLE_TAINT_FLOW
+                                + " WHERE range_id = ? ORDER BY flow_order");
 
         LOGGER.debug("Prepared statements created successfully");
     }
 
-    /**
-     * Converts a TaintInfo object to JSON string for storage.
-     *
-     * @param taintInfo The TaintInfo to serialize
-     * @return JSON string representation
-     */
-    private String serializeToJson(TaintInfo taintInfo) {
-        // Create a simplified JSON representation
-        // In production, this should reconstruct the full Foxhound format
-        JSONObject json = new JSONObject();
-
-        JSONObject detail = new JSONObject();
-        detail.put("str", taintInfo.getStr());
-        detail.put("loc", taintInfo.getLocationName());
-        detail.put("parentloc", taintInfo.getParentLocation());
-        detail.put("referrer", taintInfo.getReferrer());
-        detail.put("sink", taintInfo.getSinkName());
-        detail.put("timestamp", taintInfo.getTimeStamp());
-        detail.put("subframe", taintInfo.isSubframe());
-
-        json.put("detail", detail);
-        json.put("taint", new net.sf.json.JSONArray()); // Simplified for now
-
-        return json.toString();
-    }
-
-    /**
-     * Insert a TaintInfo object into the database.
-     *
-     * @param taintInfo The TaintInfo to persist
-     * @throws SQLException if insertion fails
-     */
+    /** Insert a TaintInfo object using normalized tables. */
     public synchronized void insert(TaintInfo taintInfo) throws SQLException {
         if (taintInfo == null) {
             throw new IllegalArgumentException("TaintInfo cannot be null");
         }
 
-        // Use original JSON if available, otherwise create simplified version
-        String json = taintInfo.getOriginalJson();
-        if (json == null || json.isEmpty()) {
-            json = serializeToJson(taintInfo);
-            LOGGER.warn(
-                    "TaintInfo {} has no original JSON, using simplified serialization",
-                    taintInfo.getId());
+        Connection conn;
+        try {
+            conn = getConnection();
+        } catch (DatabaseException e) {
+            throw new SQLException("Failed to get database connection", e);
         }
 
-        psInsertTaintInfo.setInt(1, taintInfo.getId());
-        psInsertTaintInfo.setString(2, taintInfo.getStr());
-        psInsertTaintInfo.setString(3, taintInfo.getLocationName());
-        psInsertTaintInfo.setString(4, taintInfo.getParentLocation());
-        psInsertTaintInfo.setString(5, taintInfo.getReferrer());
-        psInsertTaintInfo.setString(6, taintInfo.getSinkName());
-        psInsertTaintInfo.setLong(7, taintInfo.getTimeStamp());
-        psInsertTaintInfo.setString(8, taintInfo.getCookie());
-        psInsertTaintInfo.setBoolean(9, taintInfo.isSubframe());
-        psInsertTaintInfo.setString(10, json);
+        conn.setAutoCommit(false);
 
-        psInsertTaintInfo.executeUpdate();
+        try {
+            // Insert main TaintInfo
+            psInsertTaintInfo.setInt(1, taintInfo.getId());
+            psInsertTaintInfo.setString(2, taintInfo.getStr());
+            psInsertTaintInfo.setString(3, taintInfo.getLocationName());
+            psInsertTaintInfo.setString(4, taintInfo.getParentLocation());
+            psInsertTaintInfo.setString(5, taintInfo.getReferrer());
+            psInsertTaintInfo.setString(6, taintInfo.getSinkName());
+            psInsertTaintInfo.setLong(7, taintInfo.getTimeStamp());
+            psInsertTaintInfo.setString(8, taintInfo.getCookie());
+            psInsertTaintInfo.setBoolean(9, taintInfo.isSubframe());
+            psInsertTaintInfo.executeUpdate();
 
-        LOGGER.debug("Inserted TaintInfo with ID: {}", taintInfo.getId());
+            // Insert main sink operation
+            if (taintInfo.getSink() != null) {
+                insertOperation(taintInfo.getId(), null, taintInfo.getSink(), false, true, conn);
+            }
+
+            // Insert source operations
+            if (taintInfo.getSources() != null) {
+                for (TaintOperation source : taintInfo.getSources()) {
+                    insertOperation(taintInfo.getId(), null, source, true, false, conn);
+                }
+            }
+
+            // Insert ranges and their operations
+            if (taintInfo.getTaintRanges() != null) {
+                for (TaintRange range : taintInfo.getTaintRanges()) {
+                    int rangeId = insertRange(taintInfo.getId(), range, conn);
+
+                    // Insert flow operations for this range
+                    if (range.getFlow() != null) {
+                        for (int i = 0; i < range.getFlow().size(); i++) {
+                            TaintOperation op = range.getFlow().get(i);
+                            int opId =
+                                    insertOperation(
+                                            taintInfo.getId(),
+                                            rangeId,
+                                            op,
+                                            op.isSource(),
+                                            false,
+                                            conn);
+
+                            // Insert flow ordering
+                            psInsertFlow.setInt(1, rangeId);
+                            psInsertFlow.setInt(2, opId);
+                            psInsertFlow.setInt(3, i);
+                            psInsertFlow.executeUpdate();
+                        }
+                    }
+                }
+            }
+
+            conn.commit();
+            LOGGER.debug("Inserted TaintInfo with ID: {}", taintInfo.getId());
+
+        } catch (SQLException e) {
+            conn.rollback();
+            throw e;
+        } finally {
+            conn.setAutoCommit(true);
+        }
     }
 
-    /**
-     * Read a TaintInfo by its ID.
-     *
-     * @param id The taint ID
-     * @return The TaintInfo or null if not found
-     * @throws SQLException if query fails
-     */
+    /** Insert a TaintOperation and return its generated ID. */
+    private int insertOperation(
+            int taintId,
+            Integer rangeId,
+            TaintOperation op,
+            boolean isSource,
+            boolean isSink,
+            Connection conn)
+            throws SQLException {
+        psInsertOperation.setInt(1, taintId);
+        if (rangeId != null) {
+            psInsertOperation.setInt(2, rangeId);
+        } else {
+            psInsertOperation.setNull(2, java.sql.Types.INTEGER);
+        }
+        psInsertOperation.setString(3, op.getOperation());
+        psInsertOperation.setBoolean(4, isSource);
+        psInsertOperation.setBoolean(5, isSink);
+
+        TaintLocation loc = op.getLocation();
+        if (loc != null) {
+            psInsertOperation.setString(6, loc.getFilename());
+            psInsertOperation.setString(7, loc.getFunction());
+            psInsertOperation.setInt(8, loc.getLine());
+            psInsertOperation.setInt(9, loc.getPos());
+            psInsertOperation.setInt(10, loc.getNextLine());
+            psInsertOperation.setInt(11, loc.getNextPos());
+            psInsertOperation.setInt(12, loc.getScriptLine());
+            psInsertOperation.setString(13, loc.getMd5());
+        } else {
+            for (int i = 6; i <= 13; i++) {
+                psInsertOperation.setNull(i, java.sql.Types.VARCHAR);
+            }
+        }
+
+        psInsertOperation.executeUpdate();
+        ResultSet rs = psInsertOperation.getGeneratedKeys();
+        if (rs.next()) {
+            return rs.getInt(1);
+        }
+        throw new SQLException("Failed to get generated operation ID");
+    }
+
+    /** Insert a TaintRange and return its generated ID. */
+    private int insertRange(int taintId, TaintRange range, Connection conn) throws SQLException {
+        psInsertRange.setInt(1, taintId);
+        psInsertRange.setInt(2, range.getBegin());
+        psInsertRange.setInt(3, range.getEnd());
+        psInsertRange.setString(4, range.getStr());
+        psInsertRange.executeUpdate();
+
+        ResultSet rs = psInsertRange.getGeneratedKeys();
+        if (rs.next()) {
+            return rs.getInt(1);
+        }
+        throw new SQLException("Failed to get generated range ID");
+    }
+
+    /** Read a TaintInfo by ID, reconstructing from normalized tables. */
     public synchronized TaintInfo read(int id) throws SQLException {
         psSelectById.setInt(1, id);
         ResultSet rs = psSelectById.executeQuery();
 
         try {
-            if (rs.next()) {
-                String json = rs.getString("original_json");
-                TaintInfo taintInfo = TaintDeserializer.deserializeTaintInfo(json);
-                if (taintInfo != null) {
-                    taintInfo.setId(id);
-                }
-                return taintInfo;
+            if (!rs.next()) {
+                return null;
             }
-            return null;
+
+            TaintInfo taintInfo = new TaintInfo();
+            taintInfo.setId(rs.getInt("taint_id"));
+            taintInfo.setStr(rs.getString("str"));
+            taintInfo.setLocationName(rs.getString("location"));
+            taintInfo.setParentLocation(rs.getString("parent_location"));
+            taintInfo.setReferrer(rs.getString("referrer"));
+            taintInfo.setSinkName(rs.getString("sink_name"));
+            taintInfo.setTimeStamp(rs.getLong("time_stamp"));
+            taintInfo.setCookie(rs.getString("cookie"));
+            taintInfo.setSubframe(rs.getBoolean("subframe"));
+
+            // Load operations
+            loadOperations(taintInfo);
+
+            // Load ranges and their flows
+            loadRanges(taintInfo);
+
+            return taintInfo;
         } finally {
             rs.close();
         }
     }
 
-    /**
-     * Read all TaintInfo objects from the database.
-     *
-     * @return List of all TaintInfo objects
-     * @throws SQLException if query fails
-     */
-    public synchronized List<TaintInfo> readAll() throws SQLException {
-        List<TaintInfo> results = new ArrayList<>();
-        ResultSet rs = psSelectAll.executeQuery();
+    /** Load operations for a TaintInfo. */
+    private void loadOperations(TaintInfo taintInfo) throws SQLException {
+        psSelectOperations.setInt(1, taintInfo.getId());
+        ResultSet rs = psSelectOperations.executeQuery();
 
         try {
             while (rs.next()) {
-                String json = rs.getString("original_json");
-                try {
-                    TaintInfo taintInfo = TaintDeserializer.deserializeTaintInfo(json);
-                    if (taintInfo != null) {
-                        results.add(taintInfo);
+                Integer rangeId = rs.getInt("range_id");
+                if (rs.wasNull()) {
+                    rangeId = null;
+                }
+
+                // Only load main sink/source operations (range_id is NULL)
+                if (rangeId == null) {
+                    TaintOperation op = buildOperation(rs);
+                    if (rs.getBoolean("is_sink")) {
+                        taintInfo.setSink(op);
+                    } else if (rs.getBoolean("is_source")) {
+                        taintInfo.getSources().add(op);
                     }
-                } catch (Exception e) {
-                    LOGGER.warn("Failed to deserialize TaintInfo", e);
+                }
+            }
+        } finally {
+            rs.close();
+        }
+    }
+
+    /** Load ranges and their flows for a TaintInfo. */
+    private void loadRanges(TaintInfo taintInfo) throws SQLException {
+        psSelectRanges.setInt(1, taintInfo.getId());
+        ResultSet rs = psSelectRanges.executeQuery();
+
+        try {
+            while (rs.next()) {
+                TaintRange range = new TaintRange();
+                int rangeId = rs.getInt("range_id");
+                range.setBegin(rs.getInt("begin_pos"));
+                range.setEnd(rs.getInt("end_pos"));
+                range.setStr(rs.getString("substring"));
+
+                // Load flow for this range
+                loadFlow(rangeId, range);
+
+                taintInfo.getTaintRanges().add(range);
+            }
+        } finally {
+            rs.close();
+        }
+    }
+
+    /** Load flow operations for a range. */
+    private void loadFlow(int rangeId, TaintRange range) throws SQLException {
+        psSelectFlow.setInt(1, rangeId);
+        ResultSet flowRs = psSelectFlow.executeQuery();
+
+        Map<Integer, TaintOperation> operations = new HashMap<>();
+
+        Connection conn;
+        try {
+            conn = getConnection();
+        } catch (DatabaseException e) {
+            throw new SQLException("Failed to get database connection", e);
+        }
+
+        // First pass: load all operations for this range
+        psSelectOperations.setInt(1, 0); // Not used
+        ResultSet opRs =
+                conn.createStatement()
+                        .executeQuery(
+                                "SELECT * FROM "
+                                        + TABLE_TAINT_OPERATION
+                                        + " WHERE range_id = "
+                                        + rangeId);
+
+        try {
+            while (opRs.next()) {
+                int opId = opRs.getInt("operation_id");
+                TaintOperation op = buildOperation(opRs);
+                operations.put(opId, op);
+
+                if (opRs.getBoolean("is_source")) {
+                    range.getSources().add(op);
+                }
+                if (opRs.getBoolean("is_sink")) {
+                    range.setSink(op);
+                }
+            }
+        } finally {
+            opRs.close();
+        }
+
+        // Second pass: build flow in correct order
+        try {
+            while (flowRs.next()) {
+                int opId = flowRs.getInt("operation_id");
+                TaintOperation op = operations.get(opId);
+                if (op != null) {
+                    range.getFlow().add(op);
+                }
+            }
+        } finally {
+            flowRs.close();
+        }
+    }
+
+    /** Build a TaintOperation from a ResultSet. */
+    private TaintOperation buildOperation(ResultSet rs) throws SQLException {
+        TaintOperation op = new TaintOperation();
+        op.setOperation(rs.getString("operation"));
+        op.setSource(rs.getBoolean("is_source"));
+
+        TaintLocation loc = new TaintLocation();
+        loc.setFilename(rs.getString("filename"));
+        loc.setFunction(rs.getString("function"));
+        loc.setLine(rs.getInt("line"));
+        loc.setPos(rs.getInt("pos"));
+        loc.setNextLine(rs.getInt("next_line"));
+        loc.setNextPos(rs.getInt("next_pos"));
+        loc.setScriptLine(rs.getInt("script_line"));
+        loc.setMd5(rs.getString("md5"));
+        op.setLocation(loc);
+
+        return op;
+    }
+
+    /** Read all TaintInfo objects. */
+    public synchronized List<TaintInfo> readAll() throws SQLException {
+        List<TaintInfo> results = new ArrayList<>();
+        ResultSet rs = psSelectAllIds.executeQuery();
+
+        try {
+            while (rs.next()) {
+                int id = rs.getInt("taint_id");
+                TaintInfo taintInfo = read(id);
+                if (taintInfo != null) {
+                    results.add(taintInfo);
                 }
             }
         } finally {
@@ -264,72 +563,29 @@ public class TaintInfoTable extends ParosAbstractTable {
         return results;
     }
 
-    /**
-     * Read filtered TaintInfo objects based on filter criteria.
-     *
-     * @param filter The filter to apply
-     * @return List of matching TaintInfo objects
-     * @throws SQLException if query fails
-     */
+    /** Read filtered TaintInfo objects. */
     public synchronized List<TaintInfo> readFiltered(TaintInfoFilter filter) throws SQLException {
-        // If no filter criteria, return all
-        if (filter.getActiveSinks().isEmpty() && filter.getActiveSources().isEmpty()) {
-            return readAll();
-        }
+        // For now, load all and filter in memory
+        // TODO: Implement SQL-based filtering
+        List<TaintInfo> all = readAll();
+        List<TaintInfo> filtered = new ArrayList<>();
 
-        List<TaintInfo> results = new ArrayList<>();
-
-        // If only sink filter is specified
-        if (!filter.getActiveSinks().isEmpty() && filter.getActiveSources().isEmpty()) {
-            for (String sinkName : filter.getActiveSinks()) {
-                psSelectBySinkName.setString(1, sinkName);
-                ResultSet rs = psSelectBySinkName.executeQuery();
-                try {
-                    while (rs.next()) {
-                        String json = rs.getString("original_json");
-                        try {
-                            TaintInfo taintInfo = TaintDeserializer.deserializeTaintInfo(json);
-                            if (taintInfo != null && filter.matches(taintInfo)) {
-                                results.add(taintInfo);
-                            }
-                        } catch (Exception e) {
-                            LOGGER.warn("Failed to deserialize TaintInfo", e);
-                        }
-                    }
-                } finally {
-                    rs.close();
-                }
-            }
-        } else {
-            // For complex filters or source-based filtering, load all and filter in memory
-            List<TaintInfo> all = readAll();
-            for (TaintInfo taintInfo : all) {
-                if (filter.matches(taintInfo)) {
-                    results.add(taintInfo);
-                }
+        for (TaintInfo taintInfo : all) {
+            if (filter.matches(taintInfo)) {
+                filtered.add(taintInfo);
             }
         }
 
-        LOGGER.debug("Filtered query returned {} TaintInfo records", results.size());
-        return results;
+        return filtered;
     }
 
-    /**
-     * Delete all TaintInfo records from the database.
-     *
-     * @throws SQLException if deletion fails
-     */
+    /** Delete all TaintInfo records (cascades to all related tables). */
     public synchronized void deleteAll() throws SQLException {
         int count = psDeleteAll.executeUpdate();
         LOGGER.debug("Deleted {} TaintInfo records", count);
     }
 
-    /**
-     * Get the maximum taint ID from the database.
-     *
-     * @return The maximum ID or -1 if no records exist
-     * @throws SQLException if query fails
-     */
+    /** Get the maximum taint ID. */
     public synchronized int getMaxId() throws SQLException {
         ResultSet rs = psGetMaxId.executeQuery();
         try {

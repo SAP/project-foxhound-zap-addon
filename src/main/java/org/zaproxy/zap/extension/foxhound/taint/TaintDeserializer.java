@@ -47,10 +47,6 @@ public class TaintDeserializer {
 
     public static TaintInfo deserializeTaintInfo(String jsonString) throws JSONException {
         TaintInfo taint = new TaintInfo();
-
-        // Store the original JSON for database persistence
-        taint.setOriginalJson(jsonString);
-
         JSONObject jsonObject = JSONObject.fromObject(jsonString);
 
         JSONObject detailObject = jsonObject.getJSONObject("detail");
