@@ -33,7 +33,7 @@ zapAddOn {
         dependencies {
             addOns {
                 register("selenium") {
-                    version.set(">=15.43.0")
+                    version.set(">=15.44.0")
                 }
                 register("network") {
                     version.set(">=0.1.0")
@@ -71,7 +71,7 @@ spotless {
 dependencies {
     compileOnly("org.zaproxy.addon:commonlib:1.36.0")
     compileOnly("org.zaproxy.addon:network:0.1.0")
-    compileOnly("org.zaproxy.addon:selenium:15.43.0")
+    compileOnly("org.zaproxy.addon:selenium:15.44.0")
     compileOnly("org.zaproxy.addon:pscan:0.2.0")
     testImplementation(platform("org.junit:junit-bom:6.0.2"))
     testImplementation("org.junit.jupiter:junit-jupiter")
