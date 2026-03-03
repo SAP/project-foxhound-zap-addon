@@ -63,16 +63,33 @@ public class TaintInfoTable extends ParosAbstractTable {
     private PreparedStatement psSelectRanges;
     private PreparedStatement psSelectFlow;
 
+    // For testing - allows direct connection access
+    private Connection testConnection;
+
     public TaintInfoTable() {}
 
     @Override
     protected void reconnect(Connection conn) throws DatabaseException {
         try {
+            // Store connection for testing
+            this.testConnection = conn;
             createTables(conn);
             prepareStatements(conn);
         } catch (SQLException e) {
             throw new DatabaseException("Failed to initialize TaintInfoTable", e);
         }
+    }
+
+    /**
+     * Override getConnection to support testing with direct connection injection.
+     * In tests, testConnection will be set by reconnect(). In production, it will use parent's getConnection().
+     */
+    @Override
+    protected Connection getConnection() throws DatabaseException {
+        if (testConnection != null) {
+            return testConnection;
+        }
+        return super.getConnection();
     }
 
     /** Create all normalized tables if they don't exist. */
@@ -199,7 +216,8 @@ public class TaintInfoTable extends ParosAbstractTable {
                                 + TABLE_TAINT_OPERATION
                                 + " (taint_id, range_id, operation, is_source, is_sink, "
                                 + "filename, function, line, pos, next_line, next_pos, script_line, md5) "
-                                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        Statement.RETURN_GENERATED_KEYS);
 
         psInsertRange =
                 conn.prepareStatement(

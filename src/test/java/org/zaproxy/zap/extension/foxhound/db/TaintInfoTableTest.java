@@ -45,12 +45,18 @@ public class TaintInfoTableTest {
         // Create in-memory HSQLDB for testing
         connection = DriverManager.getConnection("jdbc:hsqldb:mem:testdb", "SA", "");
         table = new TaintInfoTable();
+
+        // Initialize the table - this will set the test connection and create tables
         table.reconnect(connection);
     }
 
     @AfterEach
     public void tearDown() throws Exception {
         if (connection != null && !connection.isClosed()) {
+            // Drop tables in reverse order of dependencies
+            connection.createStatement().execute("DROP TABLE TAINT_FLOW IF EXISTS");
+            connection.createStatement().execute("DROP TABLE TAINT_OPERATION IF EXISTS");
+            connection.createStatement().execute("DROP TABLE TAINT_RANGE IF EXISTS");
             connection.createStatement().execute("DROP TABLE TAINT_INFO IF EXISTS");
             connection.close();
         }
