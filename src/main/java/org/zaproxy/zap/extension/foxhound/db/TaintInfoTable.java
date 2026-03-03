@@ -607,13 +607,24 @@ public class TaintInfoTable extends ParosAbstractTable {
         return results;
     }
 
-    /** Read filtered TaintInfo objects. */
-    public synchronized List<TaintInfo> readFiltered(TaintInfoFilter filter) throws SQLException {
-        // For now, load all and filter in memory
-        // TODO: Implement SQL-based filtering
-        List<TaintInfo> all = readAll();
-        List<TaintInfo> filtered = new ArrayList<>();
+    /**
+     * Read filtered TaintInfo objects with session filtering.
+     *
+     * @param filter The filter to apply
+     * @param sessionId The session ID to filter by (0 or negative means no session filter)
+     * @return List of filtered TaintInfo objects
+     */
+    public synchronized List<TaintInfo> readFiltered(TaintInfoFilter filter, long sessionId)
+            throws SQLException {
+        // Start with session-specific or all records
+        List<TaintInfo> all;
+        if (sessionId > 0) {
+            all = readBySession(sessionId);
+        } else {
+            all = readAll();
+        }
 
+        List<TaintInfo> filtered = new ArrayList<>();
         for (TaintInfo taintInfo : all) {
             if (filter.matches(taintInfo)) {
                 filtered.add(taintInfo);
@@ -621,6 +632,18 @@ public class TaintInfoTable extends ParosAbstractTable {
         }
 
         return filtered;
+    }
+
+    /**
+     * Read filtered TaintInfo objects (no session filtering).
+     *
+     * @param filter The filter to apply
+     * @return List of filtered TaintInfo objects
+     * @deprecated Use readFiltered(TaintInfoFilter, long) with session ID instead
+     */
+    @Deprecated
+    public synchronized List<TaintInfo> readFiltered(TaintInfoFilter filter) throws SQLException {
+        return readFiltered(filter, -1);
     }
 
     /** Delete all TaintInfo records (cascades to all related tables). */

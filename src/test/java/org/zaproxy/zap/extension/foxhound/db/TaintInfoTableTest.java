@@ -164,7 +164,7 @@ public class TaintInfoTableTest {
         TaintInfoFilter filter = new TaintInfoFilter();
         filter.setSinks(List.of("eval"));
 
-        List<TaintInfo> filtered = table.readFiltered(filter);
+        List<TaintInfo> filtered = table.readFiltered(filter, -1);
 
         // Note: The simplified JSON serialization doesn't include TaintRanges,
         // so deserialization may not fully work. Just verify we get some results.
@@ -181,7 +181,7 @@ public class TaintInfoTableTest {
 
         // Empty filter should return all
         TaintInfoFilter filter = new TaintInfoFilter();
-        List<TaintInfo> filtered = table.readFiltered(filter);
+        List<TaintInfo> filtered = table.readFiltered(filter, -1);
         assertEquals(2, filtered.size());
     }
 
@@ -226,6 +226,102 @@ public class TaintInfoTableTest {
 
         assertEquals(100, table.readAll().size());
         assertEquals(99, table.getMaxId());
+    }
+
+    @Test
+    public void testInsertAndReadWithSession() throws SQLException {
+        TaintInfo taintInfo = createTestTaintInfo(1);
+        taintInfo.setSessionId(123456789L);
+
+        table.insert(taintInfo);
+
+        TaintInfo retrieved = table.read(1);
+        assertNotNull(retrieved, "TaintInfo should be retrieved");
+        assertEquals(123456789L, retrieved.getSessionId(), "Session ID should match");
+    }
+
+    @Test
+    public void testReadBySession() throws SQLException {
+        // Insert taint infos for different sessions
+        TaintInfo t1 = createTestTaintInfo(1);
+        t1.setSessionId(111L);
+        table.insert(t1);
+
+        TaintInfo t2 = createTestTaintInfo(2);
+        t2.setSessionId(222L);
+        table.insert(t2);
+
+        TaintInfo t3 = createTestTaintInfo(3);
+        t3.setSessionId(111L);
+        table.insert(t3);
+
+        // Read session 111
+        List<TaintInfo> session111 = table.readBySession(111L);
+        assertEquals(2, session111.size(), "Session 111 should have 2 taint infos");
+        assertTrue(
+                session111.stream().allMatch(t -> t.getSessionId() == 111L),
+                "All taint infos should belong to session 111");
+
+        // Read session 222
+        List<TaintInfo> session222 = table.readBySession(222L);
+        assertEquals(1, session222.size(), "Session 222 should have 1 taint info");
+        assertEquals(222L, session222.get(0).getSessionId(), "Session ID should be 222");
+    }
+
+    @Test
+    public void testDeleteBySession() throws SQLException {
+        TaintInfo t1 = createTestTaintInfo(1);
+        t1.setSessionId(111L);
+        table.insert(t1);
+
+        TaintInfo t2 = createTestTaintInfo(2);
+        t2.setSessionId(222L);
+        table.insert(t2);
+
+        TaintInfo t3 = createTestTaintInfo(3);
+        t3.setSessionId(111L);
+        table.insert(t3);
+
+        // Delete session 111
+        table.deleteBySession(111L);
+
+        // Verify session 111 data is gone
+        assertNull(table.read(1), "Taint info 1 should be deleted");
+        assertNull(table.read(3), "Taint info 3 should be deleted");
+
+        // Verify session 222 data remains
+        assertNotNull(table.read(2), "Taint info 2 should still exist");
+    }
+
+    @Test
+    public void testReadFilteredWithSession() throws SQLException {
+        // Insert taint infos for different sessions with different sink names
+        TaintInfo t1 = createTestTaintInfo(1);
+        t1.setSessionId(111L);
+        t1.setSinkName("eval");
+        t1.getSink().setOperation("eval");
+        table.insert(t1);
+
+        TaintInfo t2 = createTestTaintInfo(2);
+        t2.setSessionId(222L);
+        t2.setSinkName("eval");
+        t2.getSink().setOperation("eval");
+        table.insert(t2);
+
+        TaintInfo t3 = createTestTaintInfo(3);
+        t3.setSessionId(111L);
+        t3.setSinkName("innerHTML");
+        t3.getSink().setOperation("innerHTML");
+        table.insert(t3);
+
+        // Filter by sink name "eval" for session 111
+        TaintInfoFilter filter = new TaintInfoFilter();
+        filter.setSinks(List.of("eval"));
+        List<TaintInfo> filtered = table.readFiltered(filter, 111L);
+
+        assertEquals(1, filtered.size(), "Should find 1 taint info");
+        assertEquals(1, filtered.get(0).getId(), "Should be taint info 1");
+        assertEquals(111L, filtered.get(0).getSessionId(), "Should be session 111");
     }
 
     // Helper methods

@@ -304,16 +304,19 @@ public class TaintInfoStore implements DatabaseListener {
     }
 
     /**
-     * Get filtered TaintInfo objects. Uses database query for efficient filtering.
+     * Get filtered TaintInfo objects. Uses database query for efficient filtering. Automatically
+     * filters by current session ID.
      *
      * @param filter The filter to apply
      * @return List of matching TaintInfo objects
      */
     public List<TaintInfo> getFilteredTaintInfos(TaintInfoFilter filter) {
+        long sessionId = getCurrentSessionId();
+
         if (initialized && dbTable.isInitialized()) {
             try {
-                // Use database query for filtering
-                return dbTable.readFiltered(filter);
+                // Use database query for filtering with session ID
+                return dbTable.readFiltered(filter, sessionId);
             } catch (SQLException e) {
                 LOGGER.error("Failed to filter TaintInfo from database", e);
                 // Fallback to in-memory filtering
@@ -321,7 +324,7 @@ public class TaintInfoStore implements DatabaseListener {
         }
 
         // Fallback: filter from memory cache
-        return fallbackMemoryFilter(filter);
+        return fallbackMemoryFilter(filter, sessionId);
     }
 
     /**
