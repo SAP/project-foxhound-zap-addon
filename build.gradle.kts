@@ -58,6 +58,14 @@ java {
     targetCompatibility = javaVersion
 }
 
+repositories {
+    mavenCentral()
+    // Needed for the ZAP snapshot dependencies
+    maven {
+        url = uri("https://central.sonatype.com/repository/maven-snapshots/")
+    }
+}
+
 spotless {
     kotlinGradle {
         ktlint()
@@ -69,9 +77,11 @@ spotless {
 }
 
 dependencies {
+    compileOnly("org.zaproxy:zap:2.17.0")
     compileOnly("org.zaproxy.addon:commonlib:1.36.0")
     compileOnly("org.zaproxy.addon:network:0.1.0")
-    compileOnly("org.zaproxy.addon:selenium:15.44.0")
+    // Snapshot version includes support for custom browsers
+    compileOnly("org.zaproxy.addon:selenium:15.45.0-SNAPSHOT")
     compileOnly("org.zaproxy.addon:pscan:0.2.0")
     testImplementation(platform("org.junit:junit-bom:6.0.2"))
     testImplementation("org.junit.jupiter:junit-jupiter")
