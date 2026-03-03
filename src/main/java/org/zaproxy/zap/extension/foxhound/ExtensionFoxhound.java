@@ -59,6 +59,9 @@ public class ExtensionFoxhound extends ExtensionAdaptor implements ExampleAlertP
     public void hook(ExtensionHook extensionHook) {
         super.hook(extensionHook);
 
+        // Initialize TaintInfoStore with database
+        getTaintStore().init(getModel().getDb());
+
         // Start the alert helper
         getAlertHelper();
 
