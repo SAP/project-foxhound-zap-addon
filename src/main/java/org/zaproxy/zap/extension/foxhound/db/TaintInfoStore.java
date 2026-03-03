@@ -52,6 +52,8 @@ public class TaintInfoStore implements DatabaseListener {
     private final int maxCacheSize;
     private final ReentrantReadWriteLock cacheLock = new ReentrantReadWriteLock();
     private boolean initialized = false;
+    private volatile long currentSessionId = -1;
+    private final Object sessionLock = new Object();
 
     public TaintInfoStore() {
         this(DEFAULT_CACHE_SIZE);

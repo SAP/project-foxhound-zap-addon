@@ -112,6 +112,7 @@ public class TaintInfoTable extends ParosAbstractTable {
                             + TABLE_TAINT_INFO
                             + " ("
                             + "taint_id INTEGER PRIMARY KEY, "
+                            + "session_id BIGINT NOT NULL DEFAULT -1, "
                             + "str CLOB(16777216), "
                             + "location VARCHAR(2048), "
                             + "parent_location VARCHAR(2048), "
@@ -188,6 +189,10 @@ public class TaintInfoTable extends ParosAbstractTable {
                             + TABLE_TAINT_INFO
                             + "(sink_name)");
             stmt.execute(
+                    "CREATE INDEX IF NOT EXISTS IDX_TAINT_SESSION ON "
+                            + TABLE_TAINT_INFO
+                            + "(session_id)");
+            stmt.execute(
                     "CREATE INDEX IF NOT EXISTS IDX_OP_TAINT ON "
                             + TABLE_TAINT_OPERATION
                             + "(taint_id)");
@@ -216,9 +221,9 @@ public class TaintInfoTable extends ParosAbstractTable {
                 conn.prepareStatement(
                         "INSERT INTO "
                                 + TABLE_TAINT_INFO
-                                + " (taint_id, str, location, parent_location, referrer, sink_name, "
+                                + " (taint_id, session_id, str, location, parent_location, referrer, sink_name, "
                                 + "time_stamp, cookie, subframe) "
-                                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
         psInsertOperation =
                 conn.prepareStatement(
@@ -293,14 +298,15 @@ public class TaintInfoTable extends ParosAbstractTable {
         try {
             // Insert main TaintInfo
             psInsertTaintInfo.setInt(1, taintInfo.getId());
-            psInsertTaintInfo.setString(2, taintInfo.getStr());
-            psInsertTaintInfo.setString(3, taintInfo.getLocationName());
-            psInsertTaintInfo.setString(4, taintInfo.getParentLocation());
-            psInsertTaintInfo.setString(5, taintInfo.getReferrer());
-            psInsertTaintInfo.setString(6, taintInfo.getSinkName());
-            psInsertTaintInfo.setLong(7, taintInfo.getTimeStamp());
-            psInsertTaintInfo.setString(8, taintInfo.getCookie());
-            psInsertTaintInfo.setBoolean(9, taintInfo.isSubframe());
+            psInsertTaintInfo.setLong(2, taintInfo.getSessionId());
+            psInsertTaintInfo.setString(3, taintInfo.getStr());
+            psInsertTaintInfo.setString(4, taintInfo.getLocationName());
+            psInsertTaintInfo.setString(5, taintInfo.getParentLocation());
+            psInsertTaintInfo.setString(6, taintInfo.getReferrer());
+            psInsertTaintInfo.setString(7, taintInfo.getSinkName());
+            psInsertTaintInfo.setLong(8, taintInfo.getTimeStamp());
+            psInsertTaintInfo.setString(9, taintInfo.getCookie());
+            psInsertTaintInfo.setBoolean(10, taintInfo.isSubframe());
             psInsertTaintInfo.executeUpdate();
 
             // Insert main sink operation
@@ -424,6 +430,7 @@ public class TaintInfoTable extends ParosAbstractTable {
 
             TaintInfo taintInfo = new TaintInfo();
             taintInfo.setId(rs.getInt("taint_id"));
+            taintInfo.setSessionId(rs.getLong("session_id"));
             taintInfo.setStr(rs.getString("str"));
             taintInfo.setLocationName(rs.getString("location"));
             taintInfo.setParentLocation(rs.getString("parent_location"));
