@@ -73,13 +73,21 @@ public class TaintInfoTable extends ParosAbstractTable {
     @Override
     protected void reconnect(Connection conn) throws DatabaseException {
         try {
-            // Store connection for testing
-            this.testConnection = conn;
             createTables(conn);
             prepareStatements(conn);
         } catch (SQLException e) {
             throw new DatabaseException("Failed to initialize TaintInfoTable", e);
         }
+    }
+
+    /**
+     * Set the test connection for unit testing. This allows tests to inject a connection directly,
+     * bypassing the normal database infrastructure.
+     *
+     * @param conn The connection to use for testing
+     */
+    public void setTestConnection(Connection conn) {
+        this.testConnection = conn;
     }
 
     /**

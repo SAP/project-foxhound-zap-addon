@@ -46,7 +46,10 @@ public class TaintInfoTableTest {
         connection = DriverManager.getConnection("jdbc:hsqldb:mem:testdb", "SA", "");
         table = new TaintInfoTable();
 
-        // Initialize the table - this will set the test connection and create tables
+        // Set test connection for direct access
+        table.setTestConnection(connection);
+
+        // Initialize the table - this will create tables and prepare statements
         table.reconnect(connection);
     }
 
