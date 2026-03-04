@@ -244,20 +244,19 @@ public class ExtensionFoxhound extends ExtensionAdaptor
 
     @Override
     public void sessionAboutToChange(Session session) {
-        // Clear cache when switching sessions or starting a new session
-        // Only PRESERVE cache when saving the same session (session matches currentSessionId)
+        // Decide whether to clear the store based on session change type
         long oldSessionId = session != null ? session.getSessionId() : -1;
 
         // If we have a valid old session AND it matches our current session, we're just saving
         if (oldSessionId > 0 && oldSessionId == currentSessionId) {
-            // Session save - preserve cache
+            // Session save - preserve data
             LOGGER.info(
                     "Session {} persisting (not switching). Preserving taint data.",
                     currentSessionId);
         } else {
-            // Either switching sessions, or starting a new session - clear cache
+            // Either switching sessions, or starting a new session - clear store
             LOGGER.info(
-                    "Session changing (old: {}, current: {}). Clearing memory cache.",
+                    "Session changing (old: {}, current: {}). Clearing taint data.",
                     oldSessionId,
                     currentSessionId);
             getTaintStore().clearMemoryCache();
@@ -266,9 +265,7 @@ public class ExtensionFoxhound extends ExtensionAdaptor
 
     @Override
     public void sessionChanged(Session session) {
-        // After session change, update current session ID
-        // The databaseOpen() method will be called automatically by ZAP,
-        // which will reload data from the new session's database
+        // Update current session ID (store doesn't need to know about this)
         long newSessionId = session != null ? session.getSessionId() : -1;
         currentSessionId = newSessionId;
         LOGGER.info("Session changed to: {}", newSessionId);
