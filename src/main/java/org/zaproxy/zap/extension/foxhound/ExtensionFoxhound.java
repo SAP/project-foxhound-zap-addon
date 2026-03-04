@@ -248,33 +248,11 @@ public class ExtensionFoxhound extends ExtensionAdaptor
 
     @Override
     public void sessionAboutToChange(Session session) {
-        // Decide whether to clear the store based on session change type
-        long oldSessionId = session != null ? session.getSessionId() : -1;
-
-        LOGGER.info(
-                "sessionAboutToChange called: oldSessionId={}, currentSessionId={}",
-                oldSessionId,
-                currentSessionId);
-
-        // Preserve data when:
-        // 1. Saving same session (oldSessionId == currentSessionId)
-        // 2. Saving new session for first time (currentSessionId == -1)
-        // 3. Session parameter is null (might indicate a save operation)
-        if (session == null
-                || (oldSessionId > 0 && oldSessionId == currentSessionId)
-                || currentSessionId == -1) {
-            // Session save - preserve data
-            LOGGER.info(
-                    "Session {} persisting (not switching). Preserving taint data.",
-                    oldSessionId > 0 ? oldSessionId : "new");
-        } else {
-            // Switching between different sessions - clear store
-            LOGGER.info(
-                    "Session switching (old: {}, current: {}). Clearing taint data.",
-                    oldSessionId,
-                    currentSessionId);
-            getTaintStore().clear();
-        }
+        // Always clear the memory cache when session is about to change
+        // ZAP automatically switches database files, so we only need to clear
+        // cached data from the old session. The database is NOT cleared.
+        LOGGER.info("Session about to change, clearing memory cache");
+        getTaintStore().clearCache();
     }
 
     @Override

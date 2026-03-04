@@ -92,6 +92,14 @@ public class TaintInfoStore {
         clearMemoryCache();
     }
 
+    /**
+     * Clear only the memory cache, preserving database. Used when switching sessions - ZAP
+     * automatically switches database files, so we just need to clear stale cached data.
+     */
+    public void clearCache() {
+        clearMemoryCache();
+    }
+
     /** Clear the memory cache. Database records are preserved. */
     private void clearMemoryCache() {
         cacheLock.writeLock().lock();
