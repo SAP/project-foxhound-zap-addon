@@ -259,7 +259,7 @@ public class ExtensionFoxhound extends ExtensionAdaptor
                     "Session changing (old: {}, current: {}). Clearing taint data.",
                     oldSessionId,
                     currentSessionId);
-            getTaintStore().clearMemoryCache();
+            getTaintStore().clear();
         }
     }
 

@@ -76,8 +76,13 @@ public class TaintInfoStore {
                 "TaintInfoStore initialized (database setup will occur in extension's databaseOpen())");
     }
 
+    /** Clear all in-memory data. Persisted data is preserved. */
+    public void clear() {
+        clearMemoryCache();
+    }
+
     /** Clear the memory cache. Database records are preserved. */
-    public void clearMemoryCache() {
+    private void clearMemoryCache() {
         cacheLock.writeLock().lock();
         try {
             int size = memoryCache.size();
