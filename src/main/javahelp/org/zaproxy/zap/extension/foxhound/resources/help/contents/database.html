@@ -1,0 +1,365 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<HTML>
+<HEAD>
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8">
+<TITLE>Database &amp; Cache</TITLE>
+</HEAD>
+<BODY>
+<H1>Database &amp; Cache</H1>
+
+<p>Foxhound uses a two-tier storage architecture to provide both fast access and persistence across ZAP sessions.
+
+<H2>Architecture Overview</H2>
+
+<h3>Two-Tier Storage System</h3>
+<p>Foxhound stores taint flows in two places:
+<ul>
+<li><strong>Tier 1: LRU Cache (In-Memory)</strong> - Fast access to recently used flows
+<li><strong>Tier 2: HSQLDB (Persistent)</strong> - Complete dataset persists across sessions
+</ul>
+
+<h3>Design Goals</h3>
+<ul>
+<li><strong>Performance:</strong> LRU cache provides fast access without database queries
+<li><strong>Persistence:</strong> Database ensures no data loss when ZAP restarts
+<li><strong>Scalability:</strong> Handle thousands of flows without degrading performance
+<li><strong>Reliability:</strong> Graceful degradation if database unavailable
+</ul>
+
+<H2>LRU Cache (Tier 1)</H2>
+
+<h3>What is LRU?</h3>
+<p>Least Recently Used (LRU) is a cache eviction strategy that keeps the most recently accessed items in memory.
+<ul>
+<li>When cache is full and a new item arrives, the least recently used item is removed
+<li>Accessing an item moves it to the "most recently used" position
+<li>This strategy keeps frequently accessed data fast while using bounded memory
+</ul>
+
+<h3>Default Configuration</h3>
+<ul>
+<li><strong>Size:</strong> 1000 entries (configurable in <a href="options.html">Options</a>)
+<li><strong>Range:</strong> 1 to 100,000 entries
+<li><strong>Memory:</strong> Approximately 1-2 KB per taint flow entry
+</ul>
+
+<h3>Cache Behavior</h3>
+<p><strong>On Taint Flow Arrival:</strong>
+<ol>
+<li>New TaintInfo received from Foxhound browser
+<li>Added to LRU cache (marks as "most recently used")
+<li>Immediately written to database (write-through)
+<li>If cache exceeds configured size, least recently used entry is evicted from cache
+<li>Evicted entry remains in database, available for lazy loading
+</ol>
+
+<p><strong>On Taint Flow Access:</strong>
+<ol>
+<li>Request for TaintInfo by ID
+<li>Check LRU cache first (fast path)
+<li>If found in cache, return immediately and mark as recently used
+<li>If not found (cache miss), load from database (lazy loading)
+<li>Add loaded entry to cache
+<li>Evict least recently used entry if cache full
+</ol>
+
+<h3>Performance Characteristics</h3>
+<table border="2">
+<tr><th>Operation</th><th>Cache Hit</th><th>Cache Miss</th></tr>
+<tr><td>Read</td><td>O(1) - instant</td><td>O(log n) - database query</td></tr>
+<tr><td>Write</td><td>O(1) + DB write</td><td>O(1) + DB write</td></tr>
+<tr><td>Memory</td><td>1-2 KB per entry</td><td>Minimal (DB handles storage)</td></tr>
+</table>
+
+<h3>Tuning Cache Size</h3>
+<p>Adjust cache size based on your use case:
+<ul>
+<li><strong>Small cache (100-500):</strong>
+  <ul>
+  <li>Use when: Memory constrained, testing small applications
+  <li>Trade-off: More database queries, slower access to old flows
+  </ul>
+<li><strong>Medium cache (1000-5000):</strong>
+  <ul>
+  <li>Use when: Normal testing, moderate flow volume
+  <li>Trade-off: Balanced performance and memory usage (recommended)
+  </ul>
+<li><strong>Large cache (10000-50000):</strong>
+  <ul>
+  <li>Use when: High-volume testing, analyzing many flows
+  <li>Trade-off: Higher memory usage, better performance
+  </ul>
+<li><strong>Very large cache (50000+):</strong>
+  <ul>
+  <li>Use when: Intensive analysis sessions, plenty of RAM available
+  <li>Trade-off: May impact ZAP overall performance
+  </ul>
+</ul>
+
+<H2>Database (Tier 2)</H2>
+
+<h3>Database Technology</h3>
+<p>Foxhound uses HSQLDB, the same embedded database used by ZAP core:
+<ul>
+<li>Lightweight, Java-based SQL database
+<li>No separate server process required
+<li>Integrated with ZAP's database lifecycle
+<li>ACID compliant (Atomicity, Consistency, Isolation, Durability)
+</ul>
+
+<h3>Schema Design</h3>
+<p>Taint flows are stored in a normalized relational schema with 4 tables:
+
+<h4>1. TAINT_INFO Table (Parent)</h4>
+<p>Stores top-level taint flow information:
+<ul>
+<li>ID (primary key, auto-increment)
+<li>Timestamp
+<li>URL
+<li>Sink name
+<li>Sink parameters (JSON)
+<li>Sources (JSON array)
+<li>Stack trace
+</ul>
+
+<h4>2. TAINT_OPERATION Table</h4>
+<p>Stores individual operations in flow chains:
+<ul>
+<li>Operation ID (primary key)
+<li>Operation type (concat, assign, etc.)
+<li>Location (file path/URL)
+<li>Line number
+<li>Script line
+<li>Function name
+<li>Result value
+</ul>
+
+<h4>3. TAINT_RANGE Table</h4>
+<p>Stores tainted substrings:
+<ul>
+<li>Range ID (primary key)
+<li>TaintInfo ID (foreign key)
+<li>Begin position
+<li>End position
+<li>Tainted string value
+</ul>
+
+<h4>4. TAINT_FLOW Table</h4>
+<p>Links TaintRanges to TaintOperations:
+<ul>
+<li>Flow ID (primary key)
+<li>Range ID (foreign key)
+<li>Operation ID (foreign key)
+<li>Sequence order
+</ul>
+
+<h3>Foreign Key Relationships</h3>
+<ul>
+<li>All foreign keys use <strong>CASCADE DELETE</strong>
+<li>Deleting a TaintInfo automatically deletes all child records
+<li>Maintains referential integrity
+<li>Prevents orphaned records
+</ul>
+
+<h3>Indexes</h3>
+<p>Optimized for common query patterns:
+<ul>
+<li>Primary key indexes on all tables (auto-created)
+<li>Index on TAINT_INFO.timestamp for time-based queries
+<li>Index on TAINT_INFO.sink_name for filtering
+<li>Indexes on foreign keys for join performance
+</ul>
+
+<h3>Storage Format</h3>
+<p><strong>Pure SQL Storage:</strong>
+<ul>
+<li>No JSON storage in database (except for small arrays)
+<li>All TaintInfo fields stored in normalized tables
+<li>Enables SQL queries, reporting, and analysis
+<li>Better performance than JSON blob storage
+</ul>
+
+<H2>Write-Through Cache Strategy</H2>
+
+<h3>How It Works</h3>
+<p>Foxhound uses a write-through caching strategy:
+<ol>
+<li>New taint flow arrives
+<li><strong>Write to cache</strong> (fast, in-memory)
+<li><strong>Immediately write to database</strong> (persist)
+<li>If database write fails, log error but continue (graceful degradation)
+<li>Both cache and database stay synchronized
+</ol>
+
+<h3>Benefits</h3>
+<ul>
+<li><strong>Data safety:</strong> Every flow immediately persisted
+<li><strong>Consistency:</strong> Cache and database always in sync
+<li><strong>Reliability:</strong> No data loss even if ZAP crashes
+</ul>
+
+<h3>Trade-offs</h3>
+<ul>
+<li>Writes slightly slower than write-back (but negligible for taint flows)
+<li>Database I/O on every write
+<li>Acceptable trade-off for data safety
+</ul>
+
+<H2>Lazy Loading</H2>
+
+<h3>How It Works</h3>
+<p>Foxhound loads data from database on-demand:
+<ol>
+<li>TaintInfo requested (by ID, filter, etc.)
+<li>Check cache first
+<li>If not in cache (evicted or from previous session):
+   <ul>
+   <li>Query database
+   <li>Reconstruct TaintInfo object
+   <li>Add to cache
+   <li>Return to caller
+   </ul>
+<li>Subsequent accesses hit cache (fast path)
+</ol>
+
+<h3>Benefits</h3>
+<ul>
+<li>Bounded memory usage regardless of total flows
+<li>Fast access to frequently used flows
+<li>Transparent to callers - they don't know if data came from cache or database
+</ul>
+
+<H2>Database Lifecycle</H2>
+
+<h3>Initialization Phase</h3>
+<ol>
+<li>ZAP starts, initializes database system
+<li>Foxhound's <code>TaintInfoStore.init(Database)</code> called
+<li>TaintInfoStore registers TaintInfoTable as database listener
+<li>TaintInfoStore registers itself as database listener
+</ol>
+
+<h3>Database Open Phase</h3>
+<ol>
+<li>ZAP opens/creates database
+<li>ZAP calls <code>TaintInfoTable.reconnect(Connection)</code>
+<li>TaintInfoTable creates tables if they don't exist
+<li>TaintInfoTable prepares SQL statements
+<li>ZAP calls <code>TaintInfoStore.databaseOpen(DatabaseServer)</code>
+<li>TaintInfoStore loads maximum TaintInfo ID
+<li>TaintInfoStore optionally loads recent flows into cache (future enhancement)
+</ol>
+
+<h3>Runtime Phase</h3>
+<ul>
+<li>Taint flows arrive, written to cache and database
+<li>Queries served from cache when possible
+<li>Database queries for cache misses
+<li>Periodic database maintenance (handled by ZAP/HSQLDB)
+</ul>
+
+<h3>Shutdown Phase</h3>
+<ul>
+<li>ZAP closes database cleanly
+<li>HSQLDB flushes all pending writes
+<li>Database file closed
+<li>Next ZAP start loads persisted data
+</ul>
+
+<H2>Graceful Degradation</H2>
+
+<h3>Database Unavailable</h3>
+<p>If database operations fail:
+<ul>
+<li>Foxhound continues in <strong>memory-only mode</strong>
+<li>LRU cache still works normally
+<li>Flows not persisted - lost on ZAP restart
+<li>Alerts still raised, panel still functional
+<li>Error logged but functionality continues
+</ul>
+
+<h3>Recovery</h3>
+<ul>
+<li>Restart ZAP to retry database initialization
+<li>Check disk space and permissions
+<li>Delete corrupted database (ZAP recreates it)
+<li>See <a href="troubleshooting.html">Troubleshooting</a> for database errors
+</ul>
+
+<H2>Data Management</H2>
+
+<h3>Clearing Data</h3>
+<p><strong>Clear All Button:</strong>
+<ul>
+<li>Clears LRU cache immediately
+<li>Does NOT delete from database
+<li>Flows reload from database on next ZAP start
+<li>Use for temporary cleanup of display
+</ul>
+
+<p><strong>Permanent Deletion:</strong>
+<ul>
+<li>Currently: Manually delete ZAP database (advanced users)
+<li>Future: May add option to permanently delete flows
+</ul>
+
+<h3>Session Management</h3>
+<p><strong>Session Changes:</strong>
+<ul>
+<li>When ZAP session parameter changes (but not null):
+   <ul>
+   <li>Cache is cleared
+   <li>Database is NOT cleared (persists across sessions)
+   </ul>
+<li>When session is null (default session):
+   <ul>
+   <li>Cache cleared only
+   <li>Database preserves all historical data
+   </ul>
+</ul>
+
+<H2>Performance Tuning</H2>
+
+<h3>For High-Volume Testing</h3>
+<ul>
+<li>Increase cache size to 5000-10000 entries
+<li>Monitor ZAP memory usage
+<li>Periodically clear old flows if performance degrades
+<li>Consider filtering to reduce flow volume
+</ul>
+
+<h3>For Low-Memory Environments</h3>
+<ul>
+<li>Decrease cache size to 100-500 entries
+<li>More database queries, but manageable
+<li>Disable noisy sources/sinks to reduce flow volume
+</ul>
+
+<h3>Database Optimization</h3>
+<ul>
+<li>HSQLDB handles optimization automatically
+<li>Indexes pre-configured for common queries
+<li>No manual tuning required for most users
+</ul>
+
+<H2>See Also</H2>
+<table>
+<tr>
+    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+    <td><a href="options.html">Options</a></td>
+    <td>for configuring cache size</td>
+</tr>
+<tr>
+    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+    <td><a href="troubleshooting.html">Troubleshooting</a></td>
+    <td>for database errors and performance issues</td>
+</tr>
+<tr>
+    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+    <td><a href="panel.html">Foxhound Panel</a></td>
+    <td>for clearing cache and viewing flows</td>
+</tr>
+</table>
+
+</BODY>
+</HTML>

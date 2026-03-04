@@ -1,0 +1,135 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<HTML>
+<HEAD>
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8">
+<TITLE>Getting Started</TITLE>
+</HEAD>
+<BODY>
+<H1>Getting Started</H1>
+
+<p>This guide will help you install and configure the Foxhound add-on for your first taint flow analysis.
+
+<H2>Prerequisites</H2>
+<p>Before you begin, ensure you have:
+<ul>
+<li>ZAP version 2.17.0 or later installed
+<li>Selenium add-on (version 15.44.0+) - install from ZAP Marketplace if needed
+<li>Network add-on (version 0.1.0+) - install from ZAP Marketplace if needed
+</ul>
+
+<H2>Installing Foxhound Browser</H2>
+<p>Foxhound is a modified Firefox browser with built-in taint tracking capabilities. To install:
+
+<ol>
+<li>Visit <a href="https://foxhound.ias.tu-bs.de/">foxhound.ias.tu-bs.de</a>
+<li>Download the Foxhound browser for your operating system (Windows, Linux, or macOS)
+<li>Extract the downloaded archive to a location on your system
+<li>Note the path to the Foxhound executable (e.g., <code>foxhound.exe</code> on Windows or <code>foxhound</code> on Linux)
+</ol>
+
+<H2>Configuring ZAP</H2>
+<p>Configure ZAP to use the Foxhound browser:
+
+<ol>
+<li>Open ZAP
+<li>Navigate to <strong>Tools</strong> &rarr; <strong>Options</strong> &rarr; <strong>Selenium</strong> &rarr; <strong>Firefox</strong>
+<li>In the <strong>Binary</strong> field, enter the full path to your Foxhound executable
+<li>Click <strong>OK</strong> to save your settings
+</ol>
+
+<p><strong>Note:</strong> If the binary path is not set correctly, you will see an error message when trying to launch Foxhound.
+
+<H2>First Launch</H2>
+<p>Launch your first Foxhound browser instance:
+
+<ol>
+<li>In ZAP, locate the Foxhound panel at the bottom of the window (in the Status panels area)
+<li>Click the <strong>Launch Foxhound</strong> button in the Foxhound panel toolbar
+<li>A new Foxhound browser window will open
+<li>The first launch may take a few moments as ZAP creates the "foxhound-profile" with taint tracking preferences
+</ol>
+
+<p><strong>What happens during launch:</strong>
+<ul>
+<li>ZAP creates a Firefox profile named "foxhound-profile" if it doesn't exist
+<li>Taint tracking preferences are written to the profile's <code>user.js</code> file
+<li>The export server URL is configured to send data to ZAP (default: <code>http://localhost:55676</code>)
+<li>ZAP configures the browser proxy settings to route traffic through ZAP
+</ul>
+
+<H2>Capturing Your First Taint Flow</H2>
+<p>Test the integration with a vulnerable demo application:
+
+<ol>
+<li>With Foxhound browser open, navigate to <a href="https://foxhound.ias.tu-bs.de/bheu25/demo/">https://foxhound.ias.tu-bs.de/bheu25/demo/</a>
+<li>Interact with the page (click buttons, fill forms, etc.)
+<li>As you interact, Foxhound tracks data flows and sends them to ZAP
+<li>Switch to the <strong>Foxhound panel</strong> in ZAP to view captured taint flows
+<li>Taint flows appear in a tree table showing ID, Timestamp, URL, Sink, Source, and other details
+<li>Expand taint flow nodes to see detailed operation chains
+</ol>
+
+<p><strong>What you should see:</strong>
+<ul>
+<li>The Foxhound panel footer shows "Foxhound Taint Flows: N" where N is the count
+<li>Each taint flow appears as a row in the tree table
+<li>Rows can be expanded to show TaintRanges and individual TaintOperations
+<li>Alerts may be automatically raised for detected vulnerabilities (check the Alerts tab)
+</ul>
+
+<H2>Understanding the Panel Display</H2>
+<p>The Foxhound panel displays taint flows in a hierarchical structure:
+<ul>
+<li><strong>TaintInfo</strong> - Top level: represents a complete flow from source to sink
+<li><strong>TaintRange</strong> - Child level: represents a specific substring of tainted data
+<li><strong>TaintOperation</strong> - Leaf level: individual operations in the data flow
+</ul>
+
+<p>Key columns:
+<ul>
+<li><strong>ID</strong> - Unique identifier for the taint flow
+<li><strong>Timestamp</strong> - When the flow was captured
+<li><strong>URL</strong> - Page where the flow occurred
+<li><strong>Sink</strong> - Dangerous operation (e.g., eval, innerHTML)
+<li><strong>Source</strong> - Data origin (e.g., location.hash, document.cookie)
+<li><strong>String</strong> - The actual tainted data
+<li><strong>Flow</strong> - Type of operation (e.g., string_concat, assign)
+<li><strong>Location/Line</strong> - Code position where operation occurred
+</ul>
+
+<H2>Next Steps</H2>
+<p>Now that you've captured your first taint flows:
+<ul>
+<li>Explore the <a href="panel.html">Foxhound Panel</a> features (filtering, clearing, etc.)
+<li>Understand <a href="concepts.html">Core Concepts</a> of taint tracking
+<li>Review <a href="alerts.html">Alerts</a> generated for vulnerabilities
+<li>Configure <a href="options.html">Options</a> to customize behavior
+<li>Refer to <a href="troubleshooting.html">Troubleshooting</a> if you encounter issues
+</ul>
+
+<H2>See Also</H2>
+<table>
+<tr>
+    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+    <td><a href="intro.html">Foxhound Overview</a></td>
+    <td>for general information about the add-on</td>
+</tr>
+<tr>
+    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+    <td><a href="panel.html">Foxhound Panel</a></td>
+    <td>for detailed UI guide</td>
+</tr>
+<tr>
+    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+    <td><a href="options.html">Options</a></td>
+    <td>for configuration settings</td>
+</tr>
+<tr>
+    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+    <td><a href="troubleshooting.html">Troubleshooting</a></td>
+    <td>for common problems and solutions</td>
+</tr>
+</table>
+
+</BODY>
+</HTML>

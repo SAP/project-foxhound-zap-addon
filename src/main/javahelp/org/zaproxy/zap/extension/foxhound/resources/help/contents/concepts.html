@@ -1,0 +1,272 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<HTML>
+<HEAD>
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8">
+<TITLE>Core Concepts</TITLE>
+</HEAD>
+<BODY>
+<H1>Core Concepts</H1>
+
+<p>This page explains the fundamental concepts of taint tracking and how Foxhound uses them to detect vulnerabilities.
+
+<H2>Taint Tracking Fundamentals</H2>
+
+<h3>What is Taint Tracking?</h3>
+<p>Taint tracking is a dynamic analysis technique that monitors how data flows through an application at runtime. Data from untrusted sources (user input, URLs, cookies, etc.) is marked as "tainted", and the system tracks where this tainted data flows.
+
+<p>When tainted data reaches a dangerous operation (a "sink"), this indicates a potential security vulnerability.
+
+<h3>How Foxhound Implements Taint Tracking</h3>
+<p>Foxhound is a modified Firefox browser with JavaScript engine instrumentation:
+<ul>
+<li>The JavaScript engine is modified to track taint information on strings and other data types
+<li>When data comes from a configured source, it's automatically marked as tainted
+<li>As data flows through operations (concatenation, substring, assignment, etc.), taint information propagates
+<li>When tainted data reaches a configured sink, Foxhound records the complete flow chain
+<li>Flow data is sent to ZAP via HTTP for analysis and alerting
+</ul>
+
+<H2>Sources</H2>
+
+<h3>Definition</h3>
+<p>A <strong>source</strong> is an origin point for potentially dangerous data. Sources represent data that comes from outside the application's control, particularly user-controlled input.
+
+<h3>Common Sources</h3>
+<table border="2">
+<tr><th>Source</th><th>Description</th><th>Tags</th></tr>
+<tr><td>location.hash</td><td>URL fragment (data after #)</td><td>URL</td></tr>
+<tr><td>location.search</td><td>URL query string (data after ?)</td><td>URL</td></tr>
+<tr><td>location.href</td><td>Complete URL</td><td>URL</td></tr>
+<tr><td>document.URL</td><td>Document URL</td><td>URL</td></tr>
+<tr><td>document.documentURI</td><td>Document URI</td><td>URL</td></tr>
+<tr><td>document.baseURI</td><td>Base URI of document</td><td>URL</td></tr>
+<tr><td>document.cookie</td><td>Browser cookies</td><td>STORAGE</td></tr>
+<tr><td>document.referrer</td><td>Referring page URL</td><td>URL</td></tr>
+<tr><td>localStorage</td><td>Local storage data</td><td>STORAGE</td></tr>
+<tr><td>sessionStorage</td><td>Session storage data</td><td>STORAGE</td></tr>
+<tr><td>window.name</td><td>Window name property</td><td>URL</td></tr>
+<tr><td>postMessage events</td><td>Cross-window messages</td><td>NETWORK</td></tr>
+<tr><td>XMLHttpRequest responses</td><td>AJAX response data</td><td>NETWORK</td></tr>
+<tr><td>fetch() responses</td><td>Fetch API response data</td><td>NETWORK</td></tr>
+<tr><td>Input elements</td><td>Form input values</td><td>INPUT</td></tr>
+</table>
+
+<h3>Source Tags</h3>
+<p>Sources are categorized with tags that help identify attack vectors:
+<ul>
+<li><strong>URL</strong> - Data from URLs (most common for DOM XSS)
+<li><strong>INPUT</strong> - Data from form inputs
+<li><strong>STORAGE</strong> - Data from storage APIs (for stored XSS)
+<li><strong>NETWORK</strong> - Data from network requests
+</ul>
+
+<h3>Why Sources Matter</h3>
+<p>Understanding sources helps identify:
+<ul>
+<li><strong>Attack vectors:</strong> How attackers can inject malicious data
+<li><strong>Risk level:</strong> URL sources are easily controlled by attackers (high risk)
+<li><strong>Exploitation scenarios:</strong> Different sources enable different attack types
+</ul>
+
+<H2>Sinks</H2>
+
+<h3>Definition</h3>
+<p>A <strong>sink</strong> is a dangerous operation where tainted data could cause harm. Sinks are operations that execute, render, or otherwise use data in ways that could lead to code execution, injection, or other vulnerabilities.
+
+<h3>Common Sinks</h3>
+<table border="2">
+<tr><th>Sink</th><th>Description</th><th>Tags</th><th>Vulnerability</th></tr>
+<tr><td>eval()</td><td>Execute JavaScript code</td><td>XSS, JAVASCRIPT</td><td>Code execution</td></tr>
+<tr><td>Function() constructor</td><td>Create function from string</td><td>XSS, JAVASCRIPT</td><td>Code execution</td></tr>
+<tr><td>setTimeout()</td><td>Execute code after delay</td><td>XSS, JAVASCRIPT</td><td>Code execution</td></tr>
+<tr><td>setInterval()</td><td>Execute code repeatedly</td><td>XSS, JAVASCRIPT</td><td>Code execution</td></tr>
+<tr><td>innerHTML</td><td>Set HTML content</td><td>XSS, HTML</td><td>DOM manipulation</td></tr>
+<tr><td>outerHTML</td><td>Replace element HTML</td><td>XSS, HTML</td><td>DOM manipulation</td></tr>
+<tr><td>document.write()</td><td>Write to document</td><td>XSS, HTML</td><td>DOM manipulation</td></tr>
+<tr><td>document.writeln()</td><td>Write line to document</td><td>XSS, HTML</td><td>DOM manipulation</td></tr>
+<tr><td>insertAdjacentHTML()</td><td>Insert HTML at position</td><td>XSS, HTML</td><td>DOM manipulation</td></tr>
+<tr><td>location = x</td><td>Navigate to URL</td><td>XSS, URL</td><td>Open redirect, XSS</td></tr>
+<tr><td>location.href = x</td><td>Set current URL</td><td>XSS, URL</td><td>Open redirect, XSS</td></tr>
+<tr><td>location.assign()</td><td>Navigate to URL</td><td>XSS, URL</td><td>Open redirect, XSS</td></tr>
+<tr><td>window.open()</td><td>Open new window</td><td>XSS, URL</td><td>Open redirect</td></tr>
+<tr><td>element.src = x</td><td>Set element source</td><td>XSS, URL</td><td>Resource injection</td></tr>
+<tr><td>element.href = x</td><td>Set link href</td><td>XSS, URL</td><td>Link injection</td></tr>
+<tr><td>XMLHttpRequest.open()</td><td>Open HTTP request</td><td>XHR, URL</td><td>SSRF, data leakage</td></tr>
+<tr><td>fetch()</td><td>Fetch resource</td><td>XHR, URL</td><td>SSRF, data leakage</td></tr>
+<tr><td>document.cookie = x</td><td>Set cookie</td><td>STORAGE</td><td>Cookie injection</td></tr>
+<tr><td>localStorage.setItem()</td><td>Store data locally</td><td>STORAGE</td><td>Stored XSS</td></tr>
+<tr><td>sessionStorage.setItem()</td><td>Store session data</td><td>STORAGE</td><td>Stored XSS</td></tr>
+</table>
+
+<h3>Sink Tags</h3>
+<p>Sinks are categorized by vulnerability type:
+<ul>
+<li><strong>XSS</strong> - Cross-site scripting sinks (most dangerous)
+<li><strong>JAVASCRIPT</strong> - JavaScript code execution
+<li><strong>HTML</strong> - HTML injection
+<li><strong>CSS</strong> - CSS injection
+<li><strong>URL</strong> - URL manipulation (open redirects)
+<li><strong>STORAGE</strong> - Storage operations (stored XSS)
+<li><strong>XHR</strong> - Network requests (SSRF, data leakage)
+</ul>
+
+<h3>Why Sinks Matter</h3>
+<p>Sinks determine:
+<ul>
+<li><strong>Vulnerability type:</strong> What kind of attack is possible
+<li><strong>Impact severity:</strong> Code execution sinks are highest risk
+<li><strong>Exploitation difficulty:</strong> Some sinks easier to exploit than others
+</ul>
+
+<H2>Taint Flows</H2>
+
+<h3>Definition</h3>
+<p>A <strong>taint flow</strong> is the complete path that tainted data takes from a source to a sink, including all intermediate operations. Foxhound captures taint flows as TaintInfo objects.
+
+<h3>TaintInfo Structure</h3>
+<p>A TaintInfo represents one complete flow and contains:
+<ul>
+<li><strong>ID:</strong> Unique identifier
+<li><strong>Timestamp:</strong> When captured
+<li><strong>URL:</strong> Page where flow occurred
+<li><strong>Sources:</strong> List of source strings (e.g., ["location.hash"])
+<li><strong>Sink:</strong> The dangerous operation (e.g., "eval")
+<li><strong>Sink Params:</strong> Parameters passed to the sink
+<li><strong>Taint Ranges:</strong> Specific substrings and their flow chains
+<li><strong>Stack Trace:</strong> Call stack when sink was reached
+</ul>
+
+<h3>TaintRange Structure</h3>
+<p>A TaintRange represents a specific substring of tainted data within the sink parameters:
+<ul>
+<li><strong>Begin/End:</strong> Character positions (e.g., 0-15)
+<li><strong>String:</strong> The tainted substring
+<li><strong>Flow Chain:</strong> List of TaintOperations showing how data got here
+</ul>
+
+<h3>TaintOperation Structure</h3>
+<p>A TaintOperation represents one step in the data flow:
+<ul>
+<li><strong>Operation Type:</strong> What happened (e.g., "string_concat", "assign", "charCodeAt")
+<li><strong>Location:</strong> File/URL where operation occurred
+<li><strong>Line Number:</strong> Line in source code
+<li><strong>Function:</strong> JavaScript function containing the operation
+<li><strong>Result:</strong> Result of the operation (if applicable)
+</ul>
+
+<h3>Flow Visualization</h3>
+<p>The Foxhound panel visualizes flows hierarchically:
+<pre>
+TaintInfo (complete flow)
+  └─ TaintRange (tainted substring)
+      ├─ TaintOperation 1 (first step)
+      ├─ TaintOperation 2 (second step)
+      ├─ TaintOperation 3 (third step)
+      └─ ... (additional steps)
+</pre>
+
+<p><strong>Example Flow:</strong>
+<pre>
+Source: location.hash = "#alert('xss')"
+  → Operation 1: substring(1) removes "#" → "alert('xss')"
+  → Operation 2: assign to variable x
+  → Operation 3: string_concat with other data
+Sink: eval(x) executes the string
+</pre>
+
+<H2>Vulnerability Detection</H2>
+
+<h3>How Taint Flows Indicate Vulnerabilities</h3>
+<p>A taint flow indicates a vulnerability when:
+<ul>
+<li>Tainted data originates from an attacker-controlled source (e.g., URL)
+<li>The data flows through the application without proper sanitization
+<li>The data reaches a dangerous sink (e.g., eval, innerHTML)
+<li>The source + sink combination enables an attack
+</ul>
+
+<h3>Source + Sink Combinations</h3>
+<p>Different combinations indicate different vulnerability types:
+
+<table border="2">
+<tr><th>Source Tags</th><th>Sink Tags</th><th>Vulnerability</th><th>Example</th></tr>
+<tr>
+    <td>URL, INPUT</td>
+    <td>XSS</td>
+    <td>DOM XSS</td>
+    <td>location.hash → eval()</td>
+</tr>
+<tr>
+    <td>STORAGE</td>
+    <td>XSS</td>
+    <td>Stored XSS</td>
+    <td>localStorage → innerHTML</td>
+</tr>
+<tr>
+    <td>URL</td>
+    <td>STORAGE</td>
+    <td>Storage injection</td>
+    <td>location.hash → localStorage</td>
+</tr>
+<tr>
+    <td>STORAGE</td>
+    <td>XHR, URL</td>
+    <td>CSRF</td>
+    <td>localStorage → fetch()</td>
+</tr>
+<tr>
+    <td>NETWORK</td>
+    <td>XSS</td>
+    <td>Response XSS</td>
+    <td>AJAX response → eval()</td>
+</tr>
+</table>
+
+<h3>Example: DOM XSS Detection</h3>
+<p>Foxhound detects DOM XSS when:
+<ol>
+<li>Source: User controls data via URL (location.hash, location.search, etc.)
+<li>Flow: Data flows through application without encoding/sanitization
+<li>Sink: Data reaches code execution sink (eval, setTimeout, innerHTML, etc.)
+<li>Result: User can inject and execute arbitrary JavaScript
+</ol>
+
+<p><strong>Concrete Example:</strong>
+<pre>
+URL: https://example.com/#&lt;img src=x onerror=alert(1)&gt;
+
+Flow:
+1. location.hash reads "#&lt;img src=x onerror=alert(1)&gt;"
+2. substring(1) removes "#" → "&lt;img src=x onerror=alert(1)&gt;"
+3. innerHTML sink executes: element.innerHTML = tainted_data
+4. Browser parses HTML and fires onerror event → alert(1)
+
+Alert: DOM XSS vulnerability raised by Foxhound
+</pre>
+
+<H2>See Also</H2>
+<table>
+<tr>
+    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+    <td><a href="intro.html">Foxhound Overview</a></td>
+    <td>for general information</td>
+</tr>
+<tr>
+    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+    <td><a href="alerts.html">Alerts</a></td>
+    <td>for vulnerability detection details</td>
+</tr>
+<tr>
+    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+    <td><a href="panel.html">Foxhound Panel</a></td>
+    <td>for viewing and exploring flows</td>
+</tr>
+<tr>
+    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+    <td><a href="options.html">Options</a></td>
+    <td>for configuring sources and sinks</td>
+</tr>
+</table>
+
+</BODY>
+</HTML>

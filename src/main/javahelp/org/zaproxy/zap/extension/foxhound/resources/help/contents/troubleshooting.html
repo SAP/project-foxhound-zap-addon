@@ -1,0 +1,278 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<HTML>
+<HEAD>
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8">
+<TITLE>Troubleshooting</TITLE>
+</HEAD>
+<BODY>
+<H1>Troubleshooting</H1>
+
+<p>This guide covers common issues and their solutions when using the Foxhound add-on.
+
+<H2>Common Issues</H2>
+
+<h3>1. "ZAP is not configured to use Foxhound!"</h3>
+<p><strong>Symptom:</strong> Error dialog appears when clicking the Launch Foxhound button.
+
+<p><strong>Cause:</strong> The Firefox binary path in Selenium options is not set or does not point to the Foxhound executable.
+
+<p><strong>Solution:</strong>
+<ol>
+<li>Download and install Foxhound from <a href="https://foxhound.ias.tu-bs.de/">foxhound.ias.tu-bs.de</a>
+<li>In ZAP, go to <strong>Tools</strong> &rarr; <strong>Options</strong> &rarr; <strong>Selenium</strong> &rarr; <strong>Firefox</strong>
+<li>Set the <strong>Binary</strong> field to the full path of your Foxhound executable
+<li>Click <strong>OK</strong> to save
+<li>Try launching again
+</ol>
+
+<p><strong>Verification:</strong> The binary path should point to a file that exists and is executable.
+
+<h3>2. No Taint Flows Appearing</h3>
+<p><strong>Symptom:</strong> Foxhound browser launches successfully, but no taint flows appear in the panel.
+
+<p><strong>Possible Causes and Solutions:</strong>
+
+<h4>Export Server Not Running</h4>
+<ul>
+<li>Check ZAP logs for "FoxhoundExportServer started on port 55676" message
+<li>If missing, restart ZAP
+<li>If port is in use, change the port in Options (see issue #3 below)
+</ul>
+
+<h4>Port Blocked or Incorrect</h4>
+<ul>
+<li>Verify that port 55676 (or your configured port) is not blocked by firewall
+<li>Check that the export URL in foxhound-profile/user.js matches the server port
+<li>Profile location: typically in ZAP's home directory under <code>firefox/foxhound-profile/</code>
+</ul>
+
+<h4>Sources/Sinks Disabled</h4>
+<ul>
+<li>Go to <strong>Tools</strong> &rarr; <strong>Options</strong> &rarr; <strong>Foxhound</strong>
+<li>Ensure at least some sources and sinks are enabled
+<li>Try enabling all sources and sinks temporarily
+<li>Relaunch Foxhound browser
+</ul>
+
+<h4>Foxhound Not Instrumented</h4>
+<ul>
+<li>Verify you downloaded the Foxhound browser, not regular Firefox
+<li>Check browser console (F12) for taint tracking messages
+<li>Foxhound should display instrumentation information in the console
+</ul>
+
+<h4>No Taint Flows in Application</h4>
+<ul>
+<li>The web application you're testing might not have detectable data flows
+<li>Test with the demo site: <a href="https://foxhound.ias.tu-bs.de/bheu25/demo/">https://foxhound.ias.tu-bs.de/bheu25/demo/</a>
+<li>Ensure you're interacting with the page (clicking, typing) to trigger flows
+</ul>
+
+<h3>3. Port Already in Use</h3>
+<p><strong>Symptom:</strong> ZAP logs show "Failed to start FoxhoundExportServer" or "Address already in use" error.
+
+<p><strong>Cause:</strong> Another application is using port 55676, or a previous ZAP instance didn't release the port.
+
+<p><strong>Solution:</strong>
+<ol>
+<li>Close all ZAP instances
+<li>Check for processes using port 55676:
+   <ul>
+   <li><strong>Windows:</strong> <code>netstat -ano | findstr :55676</code>
+   <li><strong>Linux/Mac:</strong> <code>lsof -i :55676</code>
+   </ul>
+<li>Kill the process or wait for it to release the port
+<li>Alternatively, change the port in ZAP:
+   <ul>
+   <li>Go to <strong>Tools</strong> &rarr; <strong>Options</strong> &rarr; <strong>Foxhound</strong>
+   <li>Set <strong>Export Server Port</strong> to a different port (e.g., 55677)
+   <li>Click <strong>OK</strong>
+   <li>Restart ZAP for the change to take effect
+   </ul>
+<li>Relaunch Foxhound browser
+</ol>
+
+<p><strong>Note:</strong> After changing the port, you must relaunch the Foxhound browser for the new profile settings to be written.
+
+<h3>4. Browser Launch Fails</h3>
+<p><strong>Symptom:</strong> Error when clicking Launch button, or browser window briefly appears and closes.
+
+<p><strong>Possible Causes and Solutions:</strong>
+
+<h4>Geckodriver Issues</h4>
+<ul>
+<li>Ensure geckodriver is installed and accessible
+<li>Check Selenium add-on configuration for geckodriver path
+<li>Try using the bundled geckodriver (Selenium Options → Firefox → Bundled button)
+</ul>
+
+<h4>Profile Corruption</h4>
+<ul>
+<li>Delete the foxhound-profile directory (ZAP will recreate it)
+<li>Profile location varies by platform:
+   <ul>
+   <li><strong>Windows:</strong> <code>%USERPROFILE%\.ZAP\firefox\foxhound-profile\</code>
+   <li><strong>Linux:</strong> <code>~/.ZAP/firefox/foxhound-profile/</code>
+   <li><strong>Mac:</strong> <code>~/Library/Application Support/ZAP/firefox/foxhound-profile/</code>
+   </ul>
+<li>Relaunch Foxhound browser
+</ul>
+
+<h4>Binary Path Issues</h4>
+<ul>
+<li>Verify the binary path has no typos
+<li>Ensure path uses correct separators for your OS
+<li>Try putting the path in quotes if it contains spaces
+<li>Check file permissions (must be executable)
+</ul>
+
+<h3>5. Performance Issues</h3>
+<p><strong>Symptom:</strong> ZAP becomes slow or unresponsive with many taint flows.
+
+<p><strong>Cause:</strong> Large number of taint flows exceeds cache capacity or causes UI rendering delays.
+
+<p><strong>Solutions:</strong>
+
+<h4>Increase Cache Size</h4>
+<ol>
+<li>Go to <strong>Tools</strong> &rarr; <strong>Options</strong> &rarr; <strong>Foxhound</strong>
+<li>Increase <strong>Taint Cache Size</strong> (default 1000, max 100,000)
+<li>Larger cache reduces database queries but uses more memory
+<li>Recommended: Start with 5000 for high-traffic testing
+</ol>
+
+<h4>Use Filtering</h4>
+<ul>
+<li>Click <strong>Show Filter</strong> in the Foxhound panel
+<li>Disable noisy sources or sinks you don't need
+<li>Reduces both collection and display overhead
+</ul>
+
+<h4>Clear Old Flows</h4>
+<ul>
+<li>Click <strong>Clear All</strong> to remove flows from cache and display
+<li>Note: Flows remain in database and reload on restart
+<li>To permanently delete, manually clear the database (advanced)
+</ul>
+
+<h4>Limit Testing Scope</h4>
+<ul>
+<li>Test smaller portions of the application at a time
+<li>Clear flows between testing sessions
+<li>Use targeted testing rather than broad crawling
+</ul>
+
+<h3>6. Database Errors</h3>
+<p><strong>Symptom:</strong> Errors in logs related to TaintInfoTable or database operations.
+
+<p><strong>Cause:</strong> Database corruption, permissions issues, or disk space problems.
+
+<p><strong>Solutions:</strong>
+<ul>
+<li>Check available disk space
+<li>Close ZAP and delete the database file (ZAP will recreate it):
+   <ul>
+   <li>Database location: ZAP home directory, typically <code>db/</code> folder
+   <li>Look for <code>zapdb</code> or <code>zapdb.h2.db</code> files
+   </ul>
+<li>If issues persist, check ZAP logs for specific error messages
+<li>Note: The add-on gracefully degrades to memory-only mode if database is unavailable
+</ul>
+
+<p><strong>Graceful Degradation:</strong> If database operations fail, Foxhound continues working with in-memory cache only. Flows will not persist across ZAP restarts, but real-time tracking still works.
+
+<h3>7. Missing Alerts</h3>
+<p><strong>Symptom:</strong> Taint flows visible in panel, but no alerts raised.
+
+<p><strong>Possible Causes and Solutions:</strong>
+
+<h4>Alert Thresholds</h4>
+<ul>
+<li>Check that passive scanning is enabled in ZAP
+<li>Verify alert threshold settings (default should catch high-risk flows)
+</ul>
+
+<h4>Source/Sink Mismatch</h4>
+<ul>
+<li>Alerts only raised for specific source+sink combinations
+<li>Review <a href="alerts.html">Alerts</a> documentation for required combinations
+<li>Example: DOM XSS requires URL/INPUT sources + XSS sinks
+<li>If flows don't match patterns, only "General Taint Info" alerts are raised
+</ul>
+
+<h4>EventBus Issues</h4>
+<ul>
+<li>Restart ZAP to reset event system
+<li>Check logs for EventBus errors
+</ul>
+
+<h3>8. UI Issues</h3>
+<p><strong>Symptom:</strong> Foxhound panel not visible, tree table not updating, or filter dialog problems.
+
+<p><strong>Solutions:</strong>
+<ul>
+<li>Check that the Foxhound panel tab is visible at the bottom of ZAP
+<li>Try resizing or undocking the panel
+<li>Restart ZAP if UI elements are unresponsive
+<li>Check for conflicts with other add-ons (disable temporarily to test)
+<li>Verify ZAP version compatibility (2.17.0+ required)
+</ul>
+
+<H2>Getting Help</H2>
+
+<h3>Logging</h3>
+<p>Enable detailed logging to diagnose issues:
+<ol>
+<li>In ZAP, go to <strong>Tools</strong> &rarr; <strong>Options</strong> &rarr; <strong>JVM</strong>
+<li>Increase log level for debugging (e.g., DEBUG or TRACE)
+<li>Restart ZAP
+<li>Check log files in ZAP home directory under <code>logs/</code>
+<li>Look for messages containing "Foxhound", "TaintInfo", or "FoxhoundExportServer"
+</ol>
+
+<h3>Reporting Issues</h3>
+<p>If problems persist, report them on GitHub:
+<ul>
+<li>Visit <a href="https://github.com/SAP/project-foxhound-zap-addon/issues">GitHub Issues</a>
+<li>Search for existing issues first
+<li>When creating a new issue, include:
+   <ul>
+   <li>ZAP version
+   <li>Foxhound add-on version
+   <li>Foxhound browser version
+   <li>Operating system
+   <li>Steps to reproduce
+   <li>Relevant log excerpts
+   <li>Screenshots if applicable
+   </ul>
+</ul>
+
+<H2>Known Limitations</H2>
+<ul>
+<li><strong>Alpha Status:</strong> This add-on is in alpha. Expect bugs and breaking changes.
+<li><strong>Browser Compatibility:</strong> Only works with Foxhound browser, not regular Firefox.
+<li><strong>Performance:</strong> Very large numbers of flows (50,000+) may impact performance.
+<li><strong>Platform Support:</strong> Tested on Windows, Linux, and macOS. Other platforms may have issues.
+</ul>
+
+<H2>See Also</H2>
+<table>
+<tr>
+    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+    <td><a href="getting-started.html">Getting Started</a></td>
+    <td>for initial setup instructions</td>
+</tr>
+<tr>
+    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+    <td><a href="options.html">Options</a></td>
+    <td>for configuration settings</td>
+</tr>
+<tr>
+    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+    <td><a href="selenium.html">Selenium Integration</a></td>
+    <td>for browser integration details</td>
+</tr>
+</table>
+
+</BODY>
+</HTML>

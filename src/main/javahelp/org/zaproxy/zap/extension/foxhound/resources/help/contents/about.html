@@ -1,0 +1,236 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<HTML>
+<HEAD>
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8">
+<TITLE>About</TITLE>
+</HEAD>
+<BODY>
+<H1>About Foxhound</H1>
+
+<H2>About This Add-on</H2>
+<p>The Foxhound add-on integrates Project Foxhound, a modified Firefox browser with built-in taint tracking capabilities, into the OWASP ZAP security testing tool. This integration enables precision detection of client-side injection vulnerabilities such as DOM XSS, Stored XSS, and CSRF during dynamic security testing.
+
+<p>The add-on provides:
+<ul>
+<li>Real-time taint flow tracking from browser to ZAP
+<li>Automatic vulnerability detection and alerting
+<li>Interactive visualization of data flow paths
+<li>Persistent storage across testing sessions
+<li>Configurable sources and sinks for focused testing
+</ul>
+
+<H2>Project Information</H2>
+
+<h3>License</h3>
+<p>This add-on is open source software licensed under the <strong>Apache License 2.0</strong>.
+
+<p>You are free to use, modify, and distribute this software under the terms of the Apache License.
+See the LICENSE file in the source repository for full license text.
+
+<h3>Copyright</h3>
+<p>Copyright 2026 SAP SE or an SAP affiliate company and project-foxhound-zap-addon contributors.
+
+<H2>Source Code</H2>
+
+<h3>Repository</h3>
+<p>The source code for this add-on is available on GitHub:
+<ul>
+<li><strong>Repository:</strong> <a href="https://github.com/SAP/project-foxhound-zap-addon">https://github.com/SAP/project-foxhound-zap-addon</a>
+<li><strong>Issues:</strong> <a href="https://github.com/SAP/project-foxhound-zap-addon/issues">Report bugs and request features</a>
+<li><strong>Releases:</strong> <a href="https://github.com/SAP/project-foxhound-zap-addon/releases">Download releases and view release notes</a>
+</ul>
+
+<h3>Contributing</h3>
+<p>Contributions are welcome! To contribute:
+<ol>
+<li>Read the <a href="https://github.com/SAP/project-foxhound-zap-addon/blob/main/CONTRIBUTING.md">Contributing Guide</a>
+<li>Fork the repository
+<li>Create a feature branch
+<li>Make your changes with tests
+<li>Submit a pull request
+<li>All contributions must follow the Developer Certificate of Origin (DCO)
+<li>Code must be licensed under Apache 2.0
+</ol>
+
+<p>For more information, see the CONTRIBUTING.md file in the repository.
+
+<H2>Authors and Contributors</H2>
+
+<h3>Primary Author</h3>
+<ul>
+<li>Thomas Barber - SAP SE
+</ul>
+
+<h3>Contributors</h3>
+<p>Thanks to all contributors who have helped improve this add-on. For a complete list, see the GitHub contributors page:
+<ul>
+<li><a href="https://github.com/SAP/project-foxhound-zap-addon/graphs/contributors">GitHub Contributors</a>
+</ul>
+
+<h3>ZAP Dev Team</h3>
+<p>This add-on builds on the excellent foundation provided by the OWASP ZAP project and its community.
+
+<H2>Related Projects</H2>
+
+<h3>Project Foxhound Browser</h3>
+<ul>
+<li><strong>Website:</strong> <a href="https://foxhound.ias.tu-bs.de/">https://foxhound.ias.tu-bs.de/</a>
+<li><strong>Repository:</strong> <a href="https://github.com/SAP/project-foxhound">https://github.com/SAP/project-foxhound</a>
+<li><strong>Description:</strong> Modified Firefox browser with JavaScript taint tracking
+<li>Download Foxhound browser to use this add-on
+</ul>
+
+<h3>OWASP ZAP</h3>
+<ul>
+<li><strong>Website:</strong> <a href="https://www.zaproxy.org/">https://www.zaproxy.org/</a>
+<li><strong>Repository:</strong> <a href="https://github.com/zaproxy/zaproxy">https://github.com/zaproxy/zaproxy</a>
+<li><strong>Description:</strong> The OWASP Zed Attack Proxy - web application security scanner
+</ul>
+
+<h3>ZAP Selenium Add-on</h3>
+<ul>
+<li><strong>Repository:</strong> <a href="https://github.com/zaproxy/zap-extensions/tree/main/addOns/selenium">ZAP Extensions - Selenium</a>
+<li><strong>Description:</strong> Provides WebDriver support for ZAP browser integrations
+<li>Required dependency for Foxhound add-on
+</ul>
+
+<H2>Version History</H2>
+
+<h3>Version 0.2.0 (Unreleased)</h3>
+<p><strong>Added:</strong>
+<ul>
+<li>Comprehensive JavaHelp documentation (11 help pages)
+<li>Getting Started guide for new users
+<li>Troubleshooting guide with common issues and solutions
+<li>Core concepts guide explaining taint tracking
+<li>Options configuration guide
+<li>Vulnerability alerts reference
+<li>Database persistence architecture documentation
+<li>Selenium integration guide
+<li>Internationalization infrastructure (support for 30+ languages)
+</ul>
+
+<h3>Version 0.1.0 (2025-12-08)</h3>
+<p><strong>Initial release with the following features:</strong>
+
+<p><strong>Core Functionality:</strong>
+<ul>
+<li>Taint flow tracking integration with Project Foxhound browser
+<li>HTTP export server for receiving taint data (default port 55676)
+<li>Real-time taint flow analysis and storage
+<li>Event-driven architecture with FoxhoundEventPublisher
+</ul>
+
+<p><strong>Storage:</strong>
+<ul>
+<li>Two-tier storage architecture (LRU cache + HSQLDB)
+<li>In-memory LRU cache (default 1000 entries, configurable 1-100,000)
+<li>Persistent database with normalized schema (4 tables)
+<li>Write-through cache strategy with lazy loading
+<li>Graceful degradation if database unavailable
+</ul>
+
+<p><strong>Vulnerability Detection:</strong>
+<ul>
+<li>DOM XSS detection (Plugin ID: 40100, Risk: HIGH)
+<li>Stored XSS detection (Plugin ID: 40101, Risk: HIGH)
+<li>CSRF detection (Plugin ID: 40102, Risk: MEDIUM)
+<li>General taint info alerts (Plugin ID: 40103, Risk: INFO)
+<li>Automatic alert generation based on source+sink patterns
+</ul>
+
+<p><strong>User Interface:</strong>
+<ul>
+<li>Foxhound panel with tree table display
+<li>Hierarchical view (TaintInfo → TaintRange → TaintOperation)
+<li>Filter dialog for sources and sinks
+<li>Launch Foxhound button
+<li>Clear All button
+<li>Real-time footer counter
+</ul>
+
+<p><strong>Configuration:</strong>
+<ul>
+<li>Options panel for server port configuration
+<li>Configurable taint cache size
+<li>Sources and sinks enable/disable
+<li>Selenium profile management (foxhound-profile)
+<li>Automatic profile updates on option changes
+</ul>
+
+<p><strong>Integration:</strong>
+<ul>
+<li>Selenium add-on integration for browser launching
+<li>Automatic profile creation with taint tracking preferences
+<li>Proxy configuration for traffic routing through ZAP
+<li>Sources/sinks configuration from sourcessinks.json
+</ul>
+
+<p><strong>Internationalization:</strong>
+<ul>
+<li>Support for 48 languages via Messages.properties files
+<li>UI strings localized for global audience
+</ul>
+
+<H2>Acknowledgments</H2>
+
+<p>This project builds on research and work from:
+<ul>
+<li>Institut für Angewandte Sicherheit (TU Braunschweig) - Project Foxhound development
+<li>OWASP ZAP community - Security testing infrastructure
+<li>Mozilla Firefox - Browser foundation
+<li>Security researchers and practitioners who provided feedback
+</ul>
+
+<H2>Support and Contact</H2>
+
+<h3>Getting Help</h3>
+<ul>
+<li>Check the <a href="troubleshooting.html">Troubleshooting</a> guide for common issues
+<li>Review other help pages for detailed documentation
+<li>Search <a href="https://github.com/SAP/project-foxhound-zap-addon/issues">GitHub Issues</a> for similar problems
+<li>Create a new issue if you encounter a bug or have a feature request
+</ul>
+
+<h3>Reporting Bugs</h3>
+<p>When reporting bugs, please include:
+<ul>
+<li>ZAP version
+<li>Foxhound add-on version
+<li>Foxhound browser version
+<li>Operating system and version
+<li>Steps to reproduce the issue
+<li>Expected vs. actual behavior
+<li>Relevant log excerpts
+<li>Screenshots if applicable
+</ul>
+
+<h3>Security Issues</h3>
+<p>If you discover a security vulnerability:
+<ul>
+<li><strong>Do not</strong> create a public GitHub issue
+<li>Follow the instructions in the <a href="https://github.com/SAP/project-foxhound-zap-addon/security/policy">Security Policy</a>
+<li>Report responsibly to allow time for fixes
+</ul>
+
+<H2>See Also</H2>
+<table>
+<tr>
+    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+    <td><a href="intro.html">Foxhound Overview</a></td>
+    <td>for introduction and features</td>
+</tr>
+<tr>
+    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+    <td><a href="getting-started.html">Getting Started</a></td>
+    <td>for setup instructions</td>
+</tr>
+<tr>
+    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+    <td><a href="troubleshooting.html">Troubleshooting</a></td>
+    <td>for common problems and solutions</td>
+</tr>
+</table>
+
+</BODY>
+</HTML>
