@@ -48,9 +48,6 @@ public class ExtensionFoxhound extends ExtensionAdaptor
     private FoxhoundPanel foxhoundPanel;
     private FoxhoundScanStatus foxhoundScanStatus;
 
-    // Track current session to detect session switches vs. saves
-    private volatile long currentSessionId = -1;
-
     public ExtensionFoxhound() {
         super(NAME);
     }
@@ -129,14 +126,13 @@ public class ExtensionFoxhound extends ExtensionAdaptor
         // This ensures data collected before session save is persisted
         store.flushToDatabase();
 
-        // Update current session ID (only if model is available)
+        // Log session ID if available
         if (getModel() != null) {
             Session session = getModel().getSession();
             if (session != null) {
-                currentSessionId = session.getSessionId();
                 LOGGER.info(
                         "Database initialized with TaintInfo tables for session {}",
-                        currentSessionId);
+                        session.getSessionId());
             } else {
                 LOGGER.info("Database initialized with TaintInfo tables (no session yet)");
             }
@@ -257,9 +253,8 @@ public class ExtensionFoxhound extends ExtensionAdaptor
 
     @Override
     public void sessionChanged(Session session) {
-        // Update current session ID (store doesn't need to know about this)
+        // Log session change
         long newSessionId = session != null ? session.getSessionId() : -1;
-        currentSessionId = newSessionId;
         LOGGER.info("Session changed to: {}", newSessionId);
     }
 

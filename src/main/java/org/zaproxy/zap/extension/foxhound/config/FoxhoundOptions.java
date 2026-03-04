@@ -47,6 +47,8 @@ public class FoxhoundOptions extends VersionedAbstractParam {
     // Default values
     public static final int DEFAULT_SERVER_PORT = 55676;
     public static final int DEFAULT_TAINT_CACHE_SIZE = 1000;
+    public static final int MIN_TAINT_CACHE_SIZE = 1;
+    public static final int MAX_TAINT_CACHE_SIZE = 100000;
 
     // Concrete parameters
     private int serverPort = DEFAULT_SERVER_PORT;
@@ -83,7 +85,19 @@ public class FoxhoundOptions extends VersionedAbstractParam {
     @Override
     protected void parseImpl() {
         serverPort = getConfig().getInt(PARAM_SERVER_PORT_KEY, DEFAULT_SERVER_PORT);
-        taintCacheSize = getConfig().getInt(TAINT_CACHE_SIZE_KEY, DEFAULT_TAINT_CACHE_SIZE);
+
+        // Load cache size with validation
+        int loadedCacheSize = getConfig().getInt(TAINT_CACHE_SIZE_KEY, DEFAULT_TAINT_CACHE_SIZE);
+        if (loadedCacheSize < MIN_TAINT_CACHE_SIZE || loadedCacheSize > MAX_TAINT_CACHE_SIZE) {
+            LOGGER.warn(
+                    "Invalid cache size {} loaded from config, using default {}",
+                    loadedCacheSize,
+                    DEFAULT_TAINT_CACHE_SIZE);
+            taintCacheSize = DEFAULT_TAINT_CACHE_SIZE;
+        } else {
+            taintCacheSize = loadedCacheSize;
+        }
+
         sinksDisabled = getStringList(SINKS_DISABLED_KEY);
         sourcesDisabled = getStringList(SOURCES_DISABLED_KEY);
     }
@@ -103,6 +117,15 @@ public class FoxhoundOptions extends VersionedAbstractParam {
     }
 
     public void setTaintInfoCacheSize(int cacheSize) {
+        if (cacheSize < MIN_TAINT_CACHE_SIZE || cacheSize > MAX_TAINT_CACHE_SIZE) {
+            throw new IllegalArgumentException(
+                    "Cache size must be between "
+                            + MIN_TAINT_CACHE_SIZE
+                            + " and "
+                            + MAX_TAINT_CACHE_SIZE
+                            + ", got: "
+                            + cacheSize);
+        }
         int oldValue = this.taintCacheSize;
         this.taintCacheSize = cacheSize;
         getConfig().setProperty(TAINT_CACHE_SIZE_KEY, cacheSize);

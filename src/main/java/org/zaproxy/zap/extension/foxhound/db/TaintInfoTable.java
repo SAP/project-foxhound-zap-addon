@@ -26,8 +26,10 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.parosproxy.paros.db.DatabaseException;
@@ -545,15 +547,13 @@ public class TaintInfoTable extends ParosAbstractTable {
 
         // First pass: load all operations for this range
         psSelectOperations.setInt(1, 0); // Not used
-        ResultSet opRs =
-                conn.createStatement()
-                        .executeQuery(
+        try (Statement stmt = conn.createStatement();
+                ResultSet opRs =
+                        stmt.executeQuery(
                                 "SELECT * FROM "
                                         + TABLE_TAINT_OPERATION
                                         + " WHERE range_id = "
-                                        + rangeId);
-
-        try {
+                                        + rangeId)) {
             while (opRs.next()) {
                 int opId = opRs.getInt("operation_id");
                 TaintOperation op = buildOperation(opRs);
@@ -566,8 +566,6 @@ public class TaintInfoTable extends ParosAbstractTable {
                     range.setSink(op);
                 }
             }
-        } finally {
-            opRs.close();
         }
 
         // Second pass: build flow in correct order
@@ -626,22 +624,106 @@ public class TaintInfoTable extends ParosAbstractTable {
     }
 
     /**
-     * Read filtered TaintInfo objects.
+     * Read filtered TaintInfo objects using SQL WHERE clause for efficiency.
      *
      * @param filter The filter to apply
      * @return List of filtered TaintInfo objects
      */
     public synchronized List<TaintInfo> readFiltered(TaintInfoFilter filter) throws SQLException {
-        List<TaintInfo> all = readAll();
+        // If no filters, return all
+        if (filter.getActiveSinks().isEmpty() && filter.getActiveSources().isEmpty()) {
+            return readAll();
+        }
 
-        List<TaintInfo> filtered = new ArrayList<>();
-        for (TaintInfo taintInfo : all) {
-            if (filter.matches(taintInfo)) {
-                filtered.add(taintInfo);
+        Connection conn;
+        try {
+            conn = getConnection();
+        } catch (DatabaseException e) {
+            throw new SQLException("Failed to get database connection", e);
+        }
+
+        Set<Integer> matchingIds = new HashSet<>();
+
+        // Filter by sink names (directly on TAINT_INFO table using sink_name column)
+        if (!filter.getActiveSinks().isEmpty()) {
+            StringBuilder sinkQuery =
+                    new StringBuilder(
+                            "SELECT taint_id FROM " + TABLE_TAINT_INFO + " WHERE sink_name IN (");
+            for (int i = 0; i < filter.getActiveSinks().size(); i++) {
+                if (i > 0) sinkQuery.append(", ");
+                sinkQuery.append("?");
+            }
+            sinkQuery.append(")");
+
+            try (PreparedStatement ps = conn.prepareStatement(sinkQuery.toString())) {
+                int paramIndex = 1;
+                for (String sink : filter.getActiveSinks()) {
+                    ps.setString(paramIndex++, sink);
+                }
+
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        matchingIds.add(rs.getInt("taint_id"));
+                    }
+                }
+            }
+
+            // If sink filter exists but no matches, return empty
+            if (matchingIds.isEmpty()) {
+                return new ArrayList<>();
             }
         }
 
-        return filtered;
+        // Filter by source operations (requires join with TAINT_OPERATION table)
+        if (!filter.getActiveSources().isEmpty()) {
+            StringBuilder sourceQuery =
+                    new StringBuilder(
+                            "SELECT DISTINCT taint_id FROM "
+                                    + TABLE_TAINT_OPERATION
+                                    + " WHERE is_source = true AND operation IN (");
+            for (int i = 0; i < filter.getActiveSources().size(); i++) {
+                if (i > 0) sourceQuery.append(", ");
+                sourceQuery.append("?");
+            }
+            sourceQuery.append(")");
+
+            Set<Integer> sourceMatchingIds = new HashSet<>();
+            try (PreparedStatement ps = conn.prepareStatement(sourceQuery.toString())) {
+                int paramIndex = 1;
+                for (String source : filter.getActiveSources()) {
+                    ps.setString(paramIndex++, source);
+                }
+
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        sourceMatchingIds.add(rs.getInt("taint_id"));
+                    }
+                }
+            }
+
+            // Intersect with sink results if both filters present
+            if (!filter.getActiveSinks().isEmpty()) {
+                matchingIds.retainAll(sourceMatchingIds);
+            } else {
+                matchingIds = sourceMatchingIds;
+            }
+
+            // If no matches, return empty
+            if (matchingIds.isEmpty()) {
+                return new ArrayList<>();
+            }
+        }
+
+        // Load full TaintInfo objects for matching IDs
+        List<TaintInfo> results = new ArrayList<>();
+        for (Integer id : matchingIds) {
+            TaintInfo taintInfo = read(id);
+            if (taintInfo != null) {
+                results.add(taintInfo);
+            }
+        }
+
+        return results;
     }
 
     /** Delete all TaintInfo records (cascades to all related tables). */
