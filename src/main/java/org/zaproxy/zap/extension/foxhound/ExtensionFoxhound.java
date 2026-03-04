@@ -48,6 +48,9 @@ public class ExtensionFoxhound extends ExtensionAdaptor
     private FoxhoundPanel foxhoundPanel;
     private FoxhoundScanStatus foxhoundScanStatus;
 
+    // Track current session to detect session switches vs. saves
+    private volatile long currentSessionId = -1;
+
     public ExtensionFoxhound() {
         super(NAME);
     }
@@ -122,7 +125,15 @@ public class ExtensionFoxhound extends ExtensionAdaptor
         store.loadMaxIdFromDb();
         store.loadFromDatabase();
 
-        LOGGER.info("Database initialized with TaintInfo tables");
+        // Update current session ID
+        Session session = getModel().getSession();
+        if (session != null) {
+            currentSessionId = session.getSessionId();
+            LOGGER.info(
+                    "Database initialized with TaintInfo tables for session {}", currentSessionId);
+        } else {
+            LOGGER.info("Database initialized with TaintInfo tables");
+        }
     }
 
     @Override
@@ -228,18 +239,34 @@ public class ExtensionFoxhound extends ExtensionAdaptor
 
     @Override
     public void sessionAboutToChange(Session session) {
-        // Clear memory cache when switching sessions
-        // Each session has its own database file, so we clear the cache
-        // to avoid showing taint data from the previous session
-        LOGGER.info("Session about to change, clearing memory cache");
-        getTaintStore().clearMemoryCache();
+        // Only clear cache when actually switching sessions, not when saving
+        // When saving, session is the same as current
+        // When switching, session is different
+        long oldSessionId = session != null ? session.getSessionId() : -1;
+
+        if (oldSessionId > 0 && oldSessionId != currentSessionId) {
+            // Actual session switch - clear cache for the old session
+            LOGGER.info(
+                    "Session switching from {} to different session. Clearing memory cache.",
+                    oldSessionId);
+            getTaintStore().clearMemoryCache();
+        } else {
+            // Session save or same session - don't clear
+            LOGGER.info(
+                    "Session persisting (not switching). Preserving taint data. Old: {}, Current: {}",
+                    oldSessionId,
+                    currentSessionId);
+        }
     }
 
     @Override
     public void sessionChanged(Session session) {
-        // After session change, the databaseOpen() method will be called
-        // automatically by ZAP, which will reload data from the new session's database
-        LOGGER.info("Session changed to: {}", session != null ? session.getSessionId() : "null");
+        // After session change, update current session ID
+        // The databaseOpen() method will be called automatically by ZAP,
+        // which will reload data from the new session's database
+        long newSessionId = session != null ? session.getSessionId() : -1;
+        currentSessionId = newSessionId;
+        LOGGER.info("Session changed to: {}", newSessionId);
     }
 
     @Override
