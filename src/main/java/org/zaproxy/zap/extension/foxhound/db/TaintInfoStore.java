@@ -76,8 +76,19 @@ public class TaintInfoStore {
                 "TaintInfoStore initialized (database setup will occur in extension's databaseOpen())");
     }
 
-    /** Clear all in-memory data. Persisted data is preserved. */
+    /** Clear all data from both memory and persistent storage. */
     public void clear() {
+        // Clear database
+        if (initialized && dbTable.isInitialized()) {
+            try {
+                dbTable.deleteAll();
+                LOGGER.info("Cleared TaintInfo from database");
+            } catch (SQLException e) {
+                LOGGER.error("Failed to clear database", e);
+            }
+        }
+
+        // Clear memory cache
         clearMemoryCache();
     }
 
@@ -92,6 +103,12 @@ public class TaintInfoStore {
             cacheLock.writeLock().unlock();
         }
         FoxhoundEventPublisher.publishClearEvent();
+    }
+
+    /** Clear all TaintInfo from both memory cache and database. @deprecated Use clear() instead */
+    @Deprecated
+    public void clearAll() {
+        clear();
     }
 
     /**
@@ -135,28 +152,6 @@ public class TaintInfoStore {
             FoxhoundEventPublisher.publishEvent(
                     FoxhoundEventPublisher.TAINT_INFO_CREATED, taintInfo, null);
         }
-    }
-
-    /** Clear all TaintInfo from both memory cache and database. */
-    public void clearAll() {
-        // Clear database
-        if (initialized && dbTable.isInitialized()) {
-            try {
-                dbTable.deleteAll();
-            } catch (SQLException e) {
-                LOGGER.error("Failed to clear database", e);
-            }
-        }
-
-        // Clear memory cache
-        cacheLock.writeLock().lock();
-        try {
-            memoryCache.clear();
-        } finally {
-            cacheLock.writeLock().unlock();
-        }
-
-        FoxhoundEventPublisher.publishClearEvent();
     }
 
     /**

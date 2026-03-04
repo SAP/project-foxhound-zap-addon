@@ -73,7 +73,7 @@ public class TaintInfoStoreTest {
         store.addTaintInfo(createTestTaintInfo(-1));
         store.addTaintInfo(createTestTaintInfo(-1));
 
-        store.clearAll();
+        store.clear();
 
         // After clear, getTaintInfo should return null
         assertNull(store.getTaintInfo(0));
