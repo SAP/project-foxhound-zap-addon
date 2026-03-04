@@ -12,6 +12,8 @@ import org.parosproxy.paros.db.DatabaseUnsupportedException;
 import org.parosproxy.paros.extension.Extension;
 import org.parosproxy.paros.extension.ExtensionAdaptor;
 import org.parosproxy.paros.extension.ExtensionHook;
+import org.parosproxy.paros.extension.SessionChangedListener;
+import org.parosproxy.paros.model.Session;
 import org.zaproxy.addon.network.ExtensionNetwork;
 import org.zaproxy.zap.extension.alert.ExampleAlertProvider;
 import org.zaproxy.zap.extension.foxhound.alerts.FoxhoundAlertHelper;
@@ -25,7 +27,8 @@ import org.zaproxy.zap.extension.foxhound.ui.FoxhoundPanel;
 import org.zaproxy.zap.extension.foxhound.ui.FoxhoundScanStatus;
 import org.zaproxy.zap.extension.selenium.ExtensionSelenium;
 
-public class ExtensionFoxhound extends ExtensionAdaptor implements ExampleAlertProvider {
+public class ExtensionFoxhound extends ExtensionAdaptor
+        implements ExampleAlertProvider, SessionChangedListener {
 
     private static final Logger LOGGER = LogManager.getLogger(ExtensionFoxhound.class);
 
@@ -65,6 +68,9 @@ public class ExtensionFoxhound extends ExtensionAdaptor implements ExampleAlertP
 
         // Initialize TaintInfoStore (database setup happens in databaseOpen())
         getTaintStore().init();
+
+        // Register as session listener to clear cache on session switch
+        extensionHook.addSessionListener(this);
 
         // Start the alert helper
         getAlertHelper();
@@ -216,5 +222,33 @@ public class ExtensionFoxhound extends ExtensionAdaptor implements ExampleAlertP
     @Override
     public List<Alert> getExampleAlerts() {
         return FoxhoundAlertHelper.getExampleAlerts();
+    }
+
+    // SessionChangedListener implementation
+
+    @Override
+    public void sessionAboutToChange(Session session) {
+        // Clear memory cache when switching sessions
+        // Each session has its own database file, so we clear the cache
+        // to avoid showing taint data from the previous session
+        LOGGER.info("Session about to change, clearing memory cache");
+        getTaintStore().clearMemoryCache();
+    }
+
+    @Override
+    public void sessionChanged(Session session) {
+        // After session change, the databaseOpen() method will be called
+        // automatically by ZAP, which will reload data from the new session's database
+        LOGGER.info("Session changed to: {}", session != null ? session.getSessionId() : "null");
+    }
+
+    @Override
+    public void sessionScopeChanged(Session session) {
+        // No action needed - scope changes don't affect taint data persistence
+    }
+
+    @Override
+    public void sessionModeChanged(Control.Mode mode) {
+        // No action needed - mode changes don't affect taint data persistence
     }
 }
