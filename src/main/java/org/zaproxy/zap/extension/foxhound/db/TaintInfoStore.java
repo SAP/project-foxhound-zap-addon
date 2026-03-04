@@ -296,6 +296,41 @@ public class TaintInfoStore {
     }
 
     /**
+     * Persist any in-memory data to the database. This is called when a new database is opened to
+     * ensure data collected before the database was ready is not lost.
+     */
+    public void flushToDatabase() {
+        if (!initialized || !dbTable.isInitialized()) {
+            LOGGER.debug("Database not ready, skipping flush");
+            return;
+        }
+
+        cacheLock.readLock().lock();
+        try {
+            int flushed = 0;
+            for (CachedTaintInfo cached : memoryCache.values()) {
+                TaintInfo taintInfo = cached.getTaintInfo();
+                try {
+                    // Check if this item exists in database
+                    TaintInfo existing = dbTable.read(taintInfo.getId());
+                    if (existing == null) {
+                        // Not in database, insert it
+                        dbTable.insert(taintInfo);
+                        flushed++;
+                    }
+                } catch (SQLException e) {
+                    LOGGER.error("Failed to flush TaintInfo {} to database", taintInfo.getId(), e);
+                }
+            }
+            if (flushed > 0) {
+                LOGGER.info("Flushed {} TaintInfo objects from memory to database", flushed);
+            }
+        } finally {
+            cacheLock.readLock().unlock();
+        }
+    }
+
+    /**
      * Fallback method to filter from memory cache when database query fails.
      *
      * @param filter The filter to apply

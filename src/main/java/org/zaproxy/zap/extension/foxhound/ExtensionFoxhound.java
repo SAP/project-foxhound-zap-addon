@@ -125,6 +125,10 @@ public class ExtensionFoxhound extends ExtensionAdaptor
         store.loadMaxIdFromDb();
         store.loadFromDatabase();
 
+        // Flush any in-memory data that was collected before database was ready
+        // This ensures data collected before session save is persisted
+        store.flushToDatabase();
+
         // Update current session ID (only if model is available)
         if (getModel() != null) {
             Session session = getModel().getSession();
