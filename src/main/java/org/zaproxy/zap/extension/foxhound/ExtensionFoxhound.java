@@ -251,10 +251,18 @@ public class ExtensionFoxhound extends ExtensionAdaptor
         // Decide whether to clear the store based on session change type
         long oldSessionId = session != null ? session.getSessionId() : -1;
 
+        LOGGER.info(
+                "sessionAboutToChange called: oldSessionId={}, currentSessionId={}",
+                oldSessionId,
+                currentSessionId);
+
         // Preserve data when:
         // 1. Saving same session (oldSessionId == currentSessionId)
         // 2. Saving new session for first time (currentSessionId == -1)
-        if ((oldSessionId > 0 && oldSessionId == currentSessionId) || currentSessionId == -1) {
+        // 3. Session parameter is null (might indicate a save operation)
+        if (session == null
+                || (oldSessionId > 0 && oldSessionId == currentSessionId)
+                || currentSessionId == -1) {
             // Session save - preserve data
             LOGGER.info(
                     "Session {} persisting (not switching). Preserving taint data.",
@@ -262,7 +270,8 @@ public class ExtensionFoxhound extends ExtensionAdaptor
         } else {
             // Switching between different sessions - clear store
             LOGGER.info(
-                    "Session switching (from {} to different session). Clearing taint data.",
+                    "Session switching (old: {}, current: {}). Clearing taint data.",
+                    oldSessionId,
                     currentSessionId);
             getTaintStore().clear();
         }
