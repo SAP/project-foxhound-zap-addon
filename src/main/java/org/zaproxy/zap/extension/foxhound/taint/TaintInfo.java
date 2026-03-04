@@ -28,7 +28,6 @@ import java.util.Set;
 public class TaintInfo implements SourceSinkProvider, TaintLocationProvider {
 
     private int id = -1;
-    private long sessionId = -1;
     private String str;
     private String location;
     private String parentLocation;
@@ -73,14 +72,6 @@ public class TaintInfo implements SourceSinkProvider, TaintLocationProvider {
 
     public void setId(int id) {
         this.id = id;
-    }
-
-    public long getSessionId() {
-        return sessionId;
-    }
-
-    public void setSessionId(long sessionId) {
-        this.sessionId = sessionId;
     }
 
     public String getStr() {

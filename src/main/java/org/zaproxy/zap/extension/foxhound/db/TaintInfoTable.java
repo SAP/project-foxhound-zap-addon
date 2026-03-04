@@ -62,8 +62,6 @@ public class TaintInfoTable extends ParosAbstractTable {
     private PreparedStatement psSelectOperations;
     private PreparedStatement psSelectRanges;
     private PreparedStatement psSelectFlow;
-    private PreparedStatement psSelectBySession;
-    private PreparedStatement psDeleteBySession;
 
     // For testing - allows direct connection access
     private Connection testConnection;
@@ -101,8 +99,6 @@ public class TaintInfoTable extends ParosAbstractTable {
             if (psSelectOperations != null) psSelectOperations.close();
             if (psSelectRanges != null) psSelectRanges.close();
             if (psSelectFlow != null) psSelectFlow.close();
-            if (psSelectBySession != null) psSelectBySession.close();
-            if (psDeleteBySession != null) psDeleteBySession.close();
         } catch (SQLException e) {
             LOGGER.warn("Error closing prepared statements", e);
         }
@@ -150,7 +146,6 @@ public class TaintInfoTable extends ParosAbstractTable {
                             + TABLE_TAINT_INFO
                             + " ("
                             + "taint_id INTEGER PRIMARY KEY, "
-                            + "session_id BIGINT NOT NULL, "
                             + "str CLOB(16777216), "
                             + "location VARCHAR(2048), "
                             + "parent_location VARCHAR(2048), "
@@ -227,10 +222,6 @@ public class TaintInfoTable extends ParosAbstractTable {
                             + TABLE_TAINT_INFO
                             + "(sink_name)");
             stmt.execute(
-                    "CREATE INDEX IF NOT EXISTS IDX_TAINT_SESSION ON "
-                            + TABLE_TAINT_INFO
-                            + "(session_id)");
-            stmt.execute(
                     "CREATE INDEX IF NOT EXISTS IDX_OP_TAINT ON "
                             + TABLE_TAINT_OPERATION
                             + "(taint_id)");
@@ -259,9 +250,9 @@ public class TaintInfoTable extends ParosAbstractTable {
                 conn.prepareStatement(
                         "INSERT INTO "
                                 + TABLE_TAINT_INFO
-                                + " (taint_id, session_id, str, location, parent_location, referrer, sink_name, "
+                                + " (taint_id, str, location, parent_location, referrer, sink_name, "
                                 + "time_stamp, cookie, subframe) "
-                                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
         psInsertOperation =
                 conn.prepareStatement(
@@ -315,13 +306,6 @@ public class TaintInfoTable extends ParosAbstractTable {
                                 + TABLE_TAINT_FLOW
                                 + " WHERE range_id = ? ORDER BY flow_order");
 
-        psSelectBySession =
-                conn.prepareStatement(
-                        "SELECT taint_id FROM " + TABLE_TAINT_INFO + " WHERE session_id = ?");
-
-        psDeleteBySession =
-                conn.prepareStatement("DELETE FROM " + TABLE_TAINT_INFO + " WHERE session_id = ?");
-
         LOGGER.debug("Prepared statements created successfully");
     }
 
@@ -343,15 +327,14 @@ public class TaintInfoTable extends ParosAbstractTable {
         try {
             // Insert main TaintInfo
             psInsertTaintInfo.setInt(1, taintInfo.getId());
-            psInsertTaintInfo.setLong(2, taintInfo.getSessionId());
-            psInsertTaintInfo.setString(3, taintInfo.getStr());
-            psInsertTaintInfo.setString(4, taintInfo.getLocationName());
-            psInsertTaintInfo.setString(5, taintInfo.getParentLocation());
-            psInsertTaintInfo.setString(6, taintInfo.getReferrer());
-            psInsertTaintInfo.setString(7, taintInfo.getSinkName());
-            psInsertTaintInfo.setLong(8, taintInfo.getTimeStamp());
-            psInsertTaintInfo.setString(9, taintInfo.getCookie());
-            psInsertTaintInfo.setBoolean(10, taintInfo.isSubframe());
+            psInsertTaintInfo.setString(2, taintInfo.getStr());
+            psInsertTaintInfo.setString(3, taintInfo.getLocationName());
+            psInsertTaintInfo.setString(4, taintInfo.getParentLocation());
+            psInsertTaintInfo.setString(5, taintInfo.getReferrer());
+            psInsertTaintInfo.setString(6, taintInfo.getSinkName());
+            psInsertTaintInfo.setLong(7, taintInfo.getTimeStamp());
+            psInsertTaintInfo.setString(8, taintInfo.getCookie());
+            psInsertTaintInfo.setBoolean(9, taintInfo.isSubframe());
             psInsertTaintInfo.executeUpdate();
 
             // Insert main sink operation
@@ -475,7 +458,6 @@ public class TaintInfoTable extends ParosAbstractTable {
 
             TaintInfo taintInfo = new TaintInfo();
             taintInfo.setId(rs.getInt("taint_id"));
-            taintInfo.setSessionId(rs.getLong("session_id"));
             taintInfo.setStr(rs.getString("str"));
             taintInfo.setLocationName(rs.getString("location"));
             taintInfo.setParentLocation(rs.getString("parent_location"));
@@ -644,21 +626,13 @@ public class TaintInfoTable extends ParosAbstractTable {
     }
 
     /**
-     * Read filtered TaintInfo objects with session filtering.
+     * Read filtered TaintInfo objects.
      *
      * @param filter The filter to apply
-     * @param sessionId The session ID to filter by (0 or negative means no session filter)
      * @return List of filtered TaintInfo objects
      */
-    public synchronized List<TaintInfo> readFiltered(TaintInfoFilter filter, long sessionId)
-            throws SQLException {
-        // Start with session-specific or all records
-        List<TaintInfo> all;
-        if (sessionId > 0) {
-            all = readBySession(sessionId);
-        } else {
-            all = readAll();
-        }
+    public synchronized List<TaintInfo> readFiltered(TaintInfoFilter filter) throws SQLException {
+        List<TaintInfo> all = readAll();
 
         List<TaintInfo> filtered = new ArrayList<>();
         for (TaintInfo taintInfo : all) {
@@ -668,18 +642,6 @@ public class TaintInfoTable extends ParosAbstractTable {
         }
 
         return filtered;
-    }
-
-    /**
-     * Read filtered TaintInfo objects (no session filtering).
-     *
-     * @param filter The filter to apply
-     * @return List of filtered TaintInfo objects
-     * @deprecated Use readFiltered(TaintInfoFilter, long) with session ID instead
-     */
-    @Deprecated
-    public synchronized List<TaintInfo> readFiltered(TaintInfoFilter filter) throws SQLException {
-        return readFiltered(filter, -1);
     }
 
     /** Delete all TaintInfo records (cascades to all related tables). */
@@ -703,44 +665,5 @@ public class TaintInfoTable extends ParosAbstractTable {
         } finally {
             rs.close();
         }
-    }
-
-    /**
-     * Read all taint infos for a specific session.
-     *
-     * @param sessionId The session ID to filter by
-     * @return List of TaintInfo objects for the session
-     */
-    public synchronized List<TaintInfo> readBySession(long sessionId) throws SQLException {
-        List<TaintInfo> results = new ArrayList<>();
-
-        psSelectBySession.setLong(1, sessionId);
-        ResultSet rs = psSelectBySession.executeQuery();
-
-        try {
-            while (rs.next()) {
-                int taintId = rs.getInt("taint_id");
-                TaintInfo taintInfo = read(taintId);
-                if (taintInfo != null) {
-                    results.add(taintInfo);
-                }
-            }
-        } finally {
-            rs.close();
-        }
-
-        LOGGER.debug("Read {} TaintInfo records for session {}", results.size(), sessionId);
-        return results;
-    }
-
-    /**
-     * Delete all taint infos for a specific session.
-     *
-     * @param sessionId The session ID to delete
-     */
-    public synchronized void deleteBySession(long sessionId) throws SQLException {
-        psDeleteBySession.setLong(1, sessionId);
-        int count = psDeleteBySession.executeUpdate();
-        LOGGER.debug("Deleted {} TaintInfo records for session {}", count, sessionId);
     }
 }

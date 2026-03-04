@@ -6,7 +6,8 @@
       "Read(//c/SAPDevelop/zap/**)",
       "Bash(grep -r \"sessionAboutToChange\\\\|sessionChanged\" --include=\"*.java\" -A 5 zap-extensions/addOns/*/src/main/java)",
       "Bash(./gradlew compileJava)",
-      "Bash(xargs grep -l \"SessionChangedListener\")"
+      "Bash(xargs grep -l \"SessionChangedListener\")",
+      "Bash(./gradlew build)"
     ]
   }
 }

@@ -12,8 +12,6 @@ import org.parosproxy.paros.db.DatabaseUnsupportedException;
 import org.parosproxy.paros.extension.Extension;
 import org.parosproxy.paros.extension.ExtensionAdaptor;
 import org.parosproxy.paros.extension.ExtensionHook;
-import org.parosproxy.paros.extension.SessionChangedListener;
-import org.parosproxy.paros.model.Session;
 import org.zaproxy.addon.network.ExtensionNetwork;
 import org.zaproxy.zap.extension.alert.ExampleAlertProvider;
 import org.zaproxy.zap.extension.foxhound.alerts.FoxhoundAlertHelper;
@@ -27,8 +25,7 @@ import org.zaproxy.zap.extension.foxhound.ui.FoxhoundPanel;
 import org.zaproxy.zap.extension.foxhound.ui.FoxhoundScanStatus;
 import org.zaproxy.zap.extension.selenium.ExtensionSelenium;
 
-public class ExtensionFoxhound extends ExtensionAdaptor
-        implements ExampleAlertProvider, SessionChangedListener {
+public class ExtensionFoxhound extends ExtensionAdaptor implements ExampleAlertProvider {
 
     private static final Logger LOGGER = LogManager.getLogger(ExtensionFoxhound.class);
 
@@ -68,16 +65,6 @@ public class ExtensionFoxhound extends ExtensionAdaptor
 
         // Initialize TaintInfoStore (database setup happens in databaseOpen())
         getTaintStore().init();
-
-        // Register as session listener
-        extensionHook.addSessionListener(this);
-
-        // Initialize current session ID (if session already exists)
-        if (getModel().getSession() != null) {
-            long sessionId = getModel().getSession().getSessionId();
-            getTaintStore().setCurrentSessionId(sessionId);
-            LOGGER.info("Initialized with session ID: {}", sessionId);
-        }
 
         // Start the alert helper
         getAlertHelper();
@@ -229,48 +216,5 @@ public class ExtensionFoxhound extends ExtensionAdaptor
     @Override
     public List<Alert> getExampleAlerts() {
         return FoxhoundAlertHelper.getExampleAlerts();
-    }
-
-    // SessionChangedListener implementation
-
-    @Override
-    public void sessionAboutToChange(Session session) {
-        // Only clear cache when actually switching sessions, not when saving
-        // When saving, session is null or same as current
-        long oldSessionId = session != null ? session.getSessionId() : -1;
-        long currentSessionId = getTaintStore().getCurrentSessionId();
-
-        if (oldSessionId > 0 && oldSessionId != currentSessionId) {
-            // Actual session switch - clear cache for the OLD session
-            LOGGER.info(
-                    "Session switching from {} to different session. Clearing taint data.",
-                    oldSessionId);
-            getTaintStore().clearMemoryCache();
-        } else {
-            // Session save or same session - don't clear
-            LOGGER.info(
-                    "Session persisting (not switching). Preserving taint data. Old: {}, Current: {}",
-                    oldSessionId,
-                    currentSessionId);
-        }
-    }
-
-    @Override
-    public void sessionChanged(Session session) {
-        long newSessionId = session != null ? session.getSessionId() : -1;
-        LOGGER.info("Session changed to: {}", newSessionId);
-
-        // Update current session ID
-        getTaintStore().setCurrentSessionId(newSessionId);
-    }
-
-    @Override
-    public void sessionScopeChanged(Session session) {
-        // No action needed
-    }
-
-    @Override
-    public void sessionModeChanged(Control.Mode mode) {
-        // No action needed
     }
 }
