@@ -125,14 +125,19 @@ public class ExtensionFoxhound extends ExtensionAdaptor
         store.loadMaxIdFromDb();
         store.loadFromDatabase();
 
-        // Update current session ID
-        Session session = getModel().getSession();
-        if (session != null) {
-            currentSessionId = session.getSessionId();
-            LOGGER.info(
-                    "Database initialized with TaintInfo tables for session {}", currentSessionId);
+        // Update current session ID (only if model is available)
+        if (getModel() != null) {
+            Session session = getModel().getSession();
+            if (session != null) {
+                currentSessionId = session.getSessionId();
+                LOGGER.info(
+                        "Database initialized with TaintInfo tables for session {}",
+                        currentSessionId);
+            } else {
+                LOGGER.info("Database initialized with TaintInfo tables (no session yet)");
+            }
         } else {
-            LOGGER.info("Database initialized with TaintInfo tables");
+            LOGGER.info("Database initialized with TaintInfo tables (model not available)");
         }
     }
 
