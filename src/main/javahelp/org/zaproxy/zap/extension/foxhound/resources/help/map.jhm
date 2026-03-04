@@ -1,0 +1,19 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE map
+  PUBLIC "-//Sun Microsystems Inc.//DTD JavaHelp Map Version 1.0//EN"
+         "http://java.sun.com/products/javahelp/map_1_0.dtd">
+
+<map version="1.0">
+    <mapID target="addon.foxhound.icon" url="contents/images/foxhound.png" />
+    <mapID target="addon.foxhound.intro" url="contents/intro.html" />
+    <mapID target="addon.foxhound.concepts" url="contents/concepts.html" />
+    <mapID target="addon.foxhound.gettingstarted" url="contents/getting-started.html" />
+    <mapID target="addon.foxhound.panel" url="contents/panel.html" />
+    <mapID target="addon.foxhound.options" url="contents/options.html" />
+    <mapID target="addon.foxhound.alerts" url="contents/alerts.html" />
+    <mapID target="addon.foxhound.database" url="contents/database.html" />
+    <mapID target="addon.foxhound.selenium" url="contents/selenium.html" />
+    <mapID target="addon.foxhound.troubleshooting" url="contents/troubleshooting.html" />
+    <mapID target="addon.foxhound.api" url="contents/api.html" />
+    <mapID target="addon.foxhound.about" url="contents/about.html" />
+</map>

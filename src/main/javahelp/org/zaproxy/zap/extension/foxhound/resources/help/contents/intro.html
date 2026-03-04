@@ -1,0 +1,77 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<HTML>
+<HEAD>
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8">
+<TITLE>Foxhound</TITLE>
+</HEAD>
+<BODY>
+<H1>Foxhound</H1>
+
+<p>The Foxhound add-on integrates <a href="https://github.com/SAP/project-foxhound">Project Foxhound</a>,
+a modified Firefox browser that tracks client-side data flows, with ZAP for precision detection of
+client-side injection vulnerabilities during dynamic testing.
+
+<H2>What is Foxhound?</H2>
+<p>Foxhound is a modified Firefox browser that instruments JavaScript execution to track how data flows
+through web applications. It identifies:
+<ul>
+<li><strong>Sources</strong> - Where potentially dangerous data originates (URL parameters, cookies, localStorage, etc.)
+<li><strong>Sinks</strong> - Where data is used in potentially dangerous ways (eval, innerHTML, document.write, etc.)
+<li><strong>Taint Flows</strong> - The complete path data takes from source to sink
+</ul>
+
+<H2>Key Features</H2>
+<ul>
+<li>Real-time taint flow tracking during browser execution
+<li>Persistent storage of taint flows across ZAP sessions
+<li>Automatic vulnerability detection for DOM XSS, Stored XSS, and CSRF
+<li>Interactive UI panel for exploring data flows
+<li>Configurable sources and sinks
+<li>LRU cache with database persistence (default 1000 entries)
+<li>Seamless Selenium integration for automated testing
+</ul>
+
+<H2>How It Works</H2>
+<ol>
+<li>Launch a Foxhound browser from ZAP using the toolbar button
+<li>Navigate to target web applications
+<li>Foxhound tracks client-side data flows in real-time
+<li>Taint flow data is sent to ZAP's export server (default port 55676)
+<li>ZAP analyzes flows and raises alerts for vulnerabilities
+<li>View and filter taint flows in the Foxhound panel
+</ol>
+
+<H2>Requirements</H2>
+<ul>
+<li>Foxhound browser binary (download from <a href="https://foxhound.ias.tu-bs.de/">foxhound.ias.tu-bs.de</a>)
+<li>ZAP 2.17.0 or later
+<li>Selenium add-on (version 15.44.0+)
+<li>Network add-on (version 0.1.0+)
+</ul>
+
+<H2>See Also</H2>
+<table>
+<tr>
+    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+    <td><a href="getting-started.html">Getting Started</a></td>
+    <td>for installation and initial setup</td>
+</tr>
+<tr>
+    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+    <td><a href="concepts.html">Core Concepts</a></td>
+    <td>for understanding taint flows, sources, and sinks</td>
+</tr>
+<tr>
+    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+    <td><a href="panel.html">Foxhound Panel</a></td>
+    <td>for using the taint flow viewer</td>
+</tr>
+<tr>
+    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+    <td><a href="options.html">Options</a></td>
+    <td>for configuration settings</td>
+</tr>
+</table>
+
+</BODY>
+</HTML>

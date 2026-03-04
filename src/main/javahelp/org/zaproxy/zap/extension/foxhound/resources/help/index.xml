@@ -1,0 +1,53 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE index
+  PUBLIC "-//Sun Microsystems Inc.//DTD JavaHelp Index Version 1.0//EN"
+         "http://java.sun.com/products/javahelp/index_2_0.dtd">
+
+<index version="2.0">
+    <!-- Main entries -->
+    <indexitem text="Foxhound" target="addon.foxhound.intro" />
+    <indexitem text="Foxhound Options" target="addon.foxhound.options" />
+    <indexitem text="Foxhound Panel" target="addon.foxhound.panel" />
+    <indexitem text="Foxhound Getting Started" target="addon.foxhound.gettingstarted" />
+    <indexitem text="Foxhound Troubleshooting" target="addon.foxhound.troubleshooting" />
+
+    <!-- Concepts -->
+    <indexitem text="Taint Tracking" target="addon.foxhound.concepts" />
+    <indexitem text="Taint Flow" target="addon.foxhound.concepts" />
+    <indexitem text="Taint Source" target="addon.foxhound.concepts" />
+    <indexitem text="Taint Sink" target="addon.foxhound.concepts" />
+    <indexitem text="Data Flow Analysis" target="addon.foxhound.concepts" />
+
+    <!-- Alerts -->
+    <indexitem text="DOM XSS" target="addon.foxhound.alerts" />
+    <indexitem text="Stored XSS" target="addon.foxhound.alerts" />
+    <indexitem text="CSRF" target="addon.foxhound.alerts" />
+    <indexitem text="Client-Side Injection" target="addon.foxhound.alerts" />
+    <indexitem text="Cross-Site Scripting" target="addon.foxhound.alerts" />
+
+    <!-- Technical terms -->
+    <indexitem text="LRU Cache" target="addon.foxhound.database" />
+    <indexitem text="Database Persistence" target="addon.foxhound.database" />
+    <indexitem text="TaintInfo" target="addon.foxhound.concepts" />
+    <indexitem text="TaintInfoStore" target="addon.foxhound.database" />
+    <indexitem text="Export Server" target="addon.foxhound.options" />
+    <indexitem text="Selenium Profile" target="addon.foxhound.selenium" />
+    <indexitem text="foxhound-profile" target="addon.foxhound.selenium" />
+
+    <!-- Configuration -->
+    <indexitem text="Server Port" target="addon.foxhound.options" />
+    <indexitem text="Cache Size" target="addon.foxhound.options" />
+    <indexitem text="Sources Configuration" target="addon.foxhound.options" />
+    <indexitem text="Sinks Configuration" target="addon.foxhound.options" />
+
+    <!-- UI elements -->
+    <indexitem text="Filter Dialog" target="addon.foxhound.panel" />
+    <indexitem text="Tree Table" target="addon.foxhound.panel" />
+    <indexitem text="Launch Button" target="addon.foxhound.panel" />
+
+    <!-- Problem solving -->
+    <indexitem text="Port Already in Use" target="addon.foxhound.troubleshooting" />
+    <indexitem text="Browser Launch Fails" target="addon.foxhound.troubleshooting" />
+    <indexitem text="No Taint Flows" target="addon.foxhound.troubleshooting" />
+    <indexitem text="Performance Issues" target="addon.foxhound.troubleshooting" />
+</index>

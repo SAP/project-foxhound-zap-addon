@@ -1,0 +1,307 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<HTML>
+<HEAD>
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8">
+<TITLE>Selenium Integration</TITLE>
+</HEAD>
+<BODY>
+<H1>Selenium Integration</H1>
+
+<p>Foxhound integrates with ZAP's Selenium add-on to launch and manage browser instances with taint tracking enabled.
+
+<H2>Overview</H2>
+
+<p>Foxhound leverages ZAP's Selenium infrastructure:
+<ul>
+<li>Selenium add-on manages browser drivers (geckodriver for Firefox)
+<li>Foxhound creates a specialized Firefox profile for taint tracking
+<li>The profile contains preferences that enable and configure taint tracking
+<li>Browsers launch through Selenium with the Foxhound profile
+<li>All browser traffic routes through ZAP's proxy automatically
+</ul>
+
+<H2>Foxhound Profile</H2>
+
+<h3>Profile Name</h3>
+<p><code>foxhound-profile</code> - A dedicated Firefox profile for taint tracking
+
+<h3>Profile Location</h3>
+<p>The profile is created in ZAP's home directory under the firefox subdirectory:
+<ul>
+<li><strong>Windows:</strong> <code>%USERPROFILE%\.ZAP\firefox\foxhound-profile\</code>
+<li><strong>Linux:</strong> <code>~/.ZAP/firefox/foxhound-profile/</code>
+<li><strong>Mac:</strong> <code>~/Library/Application Support/ZAP/firefox/foxhound-profile/</code>
+</ul>
+
+<h3>Profile Creation</h3>
+<p>The profile is created automatically:
+<ol>
+<li>First time you click "Launch Foxhound" button
+<li>If the profile directory doesn't exist, ZAP creates it
+<li>ZAP writes taint tracking preferences to <code>user.js</code>
+<li>Browser launches with the new profile
+</ol>
+
+<h3>Profile Updates</h3>
+<p>The profile is updated whenever:
+<ul>
+<li>Export server port changes in Options
+<li>Sources/sinks configuration changes in Options
+<li>You relaunch Foxhound browser
+<li>ZAP rewrites <code>user.js</code> with current settings
+</ul>
+
+<H2>Profile Configuration (user.js)</H2>
+
+<h3>What is user.js?</h3>
+<p><code>user.js</code> is a Firefox preferences file that sets configuration on browser startup.
+Foxhound uses it to configure taint tracking preferences.
+
+<h3>Key Preferences</h3>
+<p>Foxhound writes these preferences to user.js:
+
+<h4>Export URL</h4>
+<pre>
+user_pref("taintfox.export.url", "http://localhost:55676");
+</pre>
+<p>Tells Foxhound where to send taint flow data. The port matches the Export Server Port in Options.
+
+<h4>Export Enabled</h4>
+<pre>
+user_pref("taintfox.export.enabled", true);
+</pre>
+<p>Enables automatic export of taint flows to ZAP.
+
+<h4>Enabled Sources</h4>
+<pre>
+user_pref("taintfox.sources.enabled", "location.hash,location.search,...");
+</pre>
+<p>Comma-separated list of sources to track. Matches the sources enabled in Options.
+
+<h4>Enabled Sinks</h4>
+<pre>
+user_pref("taintfox.sinks.enabled", "eval,innerHTML,document.write,...");
+</pre>
+<p>Comma-separated list of sinks to monitor. Matches the sinks enabled in Options.
+
+<h4>Other Preferences</h4>
+<ul>
+<li>Taint tracking enable/disable flags
+<li>Logging levels
+<li>Performance tuning options
+<li>Debug settings (if enabled)
+</ul>
+
+<h3>Viewing user.js</h3>
+<p>To see the generated preferences:
+<ol>
+<li>Navigate to the profile directory (see locations above)
+<li>Open <code>user.js</code> in a text editor
+<li>Review the taintfox.* preferences
+</ol>
+
+<p><strong>Note:</strong> Do not manually edit user.js - ZAP overwrites it on every browser launch.
+
+<H2>Launch Process</H2>
+
+<h3>Step-by-Step Launch</h3>
+<p>When you click "Launch Foxhound" button:
+<ol>
+<li><strong>Profile Check:</strong> ZAP checks if foxhound-profile exists
+<li><strong>Profile Creation/Update:</strong> Creates or updates the profile directory
+<li><strong>Write Preferences:</strong> Writes user.js with current options
+<li><strong>Selenium Request:</strong> Requests Selenium add-on to launch Firefox
+<li><strong>Binary Check:</strong> Selenium verifies Foxhound binary path is set
+<li><strong>Driver Check:</strong> Selenium ensures geckodriver is available
+<li><strong>Browser Launch:</strong> Selenium starts Foxhound with:
+   <ul>
+   <li>-profile flag pointing to foxhound-profile
+   <li>Proxy settings to route traffic through ZAP
+   <li>Additional Firefox arguments if configured
+   </ul>
+<li><strong>Profile Load:</strong> Foxhound reads user.js and applies preferences
+<li><strong>Export Connection:</strong> Foxhound connects to export server
+<li><strong>Ready:</strong> Browser is ready, taint tracking active
+</ol>
+
+<h3>Launch Errors</h3>
+<p>Common launch failure points:
+<ul>
+<li><strong>Binary not set:</strong> "ZAP is not configured to use Foxhound!" error
+<li><strong>Geckodriver missing:</strong> Selenium can't start browser
+<li><strong>Port unavailable:</strong> Export server not running or port blocked
+<li><strong>Profile corruption:</strong> Delete profile directory and retry
+</ul>
+
+<p>See <a href="troubleshooting.html">Troubleshooting</a> for solutions.
+
+<H2>Browser Requirements</H2>
+
+<h3>Binary Path Configuration</h3>
+<p>Foxhound requires the binary path to be set in Selenium options:
+<ol>
+<li>Go to <strong>Tools</strong> &rarr; <strong>Options</strong> &rarr; <strong>Selenium</strong> &rarr; <strong>Firefox</strong>
+<li>Set <strong>Binary</strong> field to Foxhound executable path
+<li>Path must be absolute (e.g., <code>C:\Foxhound\foxhound.exe</code>)
+<li>Binary must be executable and valid
+</ol>
+
+<p><strong>Verification:</strong>
+<ul>
+<li>Path should point to foxhound.exe (Windows) or foxhound (Linux/Mac)
+<li>NOT regular firefox.exe
+<li>File must exist and have execute permissions
+</ul>
+
+<h3>Geckodriver</h3>
+<p>Selenium requires geckodriver to control Firefox/Foxhound:
+<ul>
+<li>Usually bundled with Selenium add-on (auto-detected)
+<li>Can be manually configured in Selenium options
+<li>Must be compatible with Foxhound version
+<li>Most Foxhound versions use recent geckodriver
+</ul>
+
+<p>To set geckodriver path:
+<ol>
+<li><strong>Tools</strong> &rarr; <strong>Options</strong> &rarr; <strong>Selenium</strong> &rarr; <strong>Firefox</strong>
+<li>Set <strong>Driver</strong> field if needed
+<li>Or click <strong>Bundled</strong> button to use ZAP's bundled driver
+</ol>
+
+<H2>Proxy Configuration</H2>
+
+<p>Selenium automatically configures the browser proxy:
+<ul>
+<li>HTTP proxy: ZAP's proxy address (usually localhost:8080)
+<li>HTTPS proxy: Same as HTTP proxy
+<li>No proxy for: localhost, 127.0.0.1 (export server)
+<li>Ensures all traffic routes through ZAP for analysis
+</ul>
+
+<p>No manual proxy configuration needed.
+
+<H2>Manual Browser Launch (Alternative)</H2>
+
+<p>You can launch Foxhound outside ZAP for advanced scenarios:
+
+<h3>Steps</h3>
+<ol>
+<li>Create a Firefox profile manually
+<li>Add taint tracking preferences to user.js
+<li>Configure export URL: <code>user_pref("taintfox.export.url", "http://localhost:55676");</code>
+<li>Configure proxy settings (to ZAP's proxy)
+<li>Launch Foxhound with -profile flag:
+   <pre>./foxhound -profile /path/to/profile</pre>
+</ol>
+
+<h3>When to Use</h3>
+<ul>
+<li>Advanced debugging scenarios
+<li>Custom profile configurations
+<li>Automated testing scripts
+<li>Non-standard Selenium setups
+</ul>
+
+<h3>Limitations</h3>
+<ul>
+<li>No automatic profile updates when options change
+<li>Must manually configure proxy
+<li>Must manually set preferences
+<li>No integration with ZAP's browser launch button
+</ul>
+
+<p><strong>Recommendation:</strong> Use the Launch button for normal testing. Manual launch only for advanced use cases.
+
+<H2>Multiple Browser Instances</H2>
+
+<p>You can launch multiple Foxhound instances:
+<ul>
+<li>Click "Launch Foxhound" button multiple times
+<li>Each instance uses the same foxhound-profile
+<li>All instances send data to the same export server
+<li>Taint flows from all instances appear in the same panel
+<li>No differentiation between instances (by design)
+</ul>
+
+<p><strong>Use Cases:</strong>
+<ul>
+<li>Testing multiple user sessions simultaneously
+<li>Comparing different attack vectors in parallel
+<li>Distributed testing across multiple applications
+</ul>
+
+<H2>Profile Management</H2>
+
+<h3>Resetting Profile</h3>
+<p>If the profile becomes corrupted:
+<ol>
+<li>Close all Foxhound browser instances
+<li>Close ZAP (optional, but recommended)
+<li>Delete the foxhound-profile directory
+<li>Restart ZAP
+<li>Click "Launch Foxhound" - profile will be recreated
+</ol>
+
+<h3>Profile Persistence</h3>
+<ul>
+<li>Profile persists across ZAP sessions
+<li>Cookies, history, cache are stored in the profile
+<li>May grow large over time
+<li>Periodically delete and recreate if needed
+</ul>
+
+<h3>Custom Profiles (Advanced)</h3>
+<p>For custom profile setups:
+<ul>
+<li>Create a different profile directory
+<li>Configure it manually
+<li>Use manual browser launch (see above)
+<li>Not recommended for most users
+</ul>
+
+<H2>Troubleshooting Selenium Issues</H2>
+
+<h3>"ZAP is not configured to use Foxhound!"</h3>
+<ul>
+<li>Binary path not set in Selenium options
+<li>See <a href="getting-started.html">Getting Started</a> for configuration
+</ul>
+
+<h3>Browser Window Opens and Immediately Closes</h3>
+<ul>
+<li>Geckodriver compatibility issue
+<li>Profile corruption
+<li>Binary path incorrect
+<li>Check ZAP logs for Selenium errors
+</ul>
+
+<h3>No Taint Flows After Launch</h3>
+<ul>
+<li>Verify export server is running (check ZAP logs)
+<li>Check user.js has correct export URL
+<li>Ensure port 55676 (or configured port) is not blocked
+<li>See <a href="troubleshooting.html">Troubleshooting</a> for detailed steps
+</ul>
+
+<H2>See Also</H2>
+<table>
+<tr>
+    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+    <td><a href="getting-started.html">Getting Started</a></td>
+    <td>for initial setup and first launch</td>
+</tr>
+<tr>
+    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+    <td><a href="options.html">Options</a></td>
+    <td>for configuring export server and sources/sinks</td>
+</tr>
+<tr>
+    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+    <td><a href="troubleshooting.html">Troubleshooting</a></td>
+    <td>for browser launch issues</td>
+</tr>
+</table>
+
+</BODY>
+</HTML>

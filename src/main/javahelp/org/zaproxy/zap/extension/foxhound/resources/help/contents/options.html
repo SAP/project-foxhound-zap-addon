@@ -1,0 +1,239 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<HTML>
+<HEAD>
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8">
+<TITLE>Options</TITLE>
+</HEAD>
+<BODY>
+<H1>Options</H1>
+
+<p>The Foxhound options panel allows you to configure server settings, cache behavior, and enabled sources/sinks.
+
+<H2>Accessing Options</H2>
+<p>To access Foxhound options:
+<ol>
+<li>In ZAP, navigate to <strong>Tools</strong> &rarr; <strong>Options</strong>
+<li>Expand the <strong>Foxhound</strong> section in the left panel
+<li>Modify settings as needed
+<li>Click <strong>OK</strong> to save changes
+</ol>
+
+<H2>Export Server Port</H2>
+<p>The export server port is where Foxhound browsers send taint flow data to ZAP.
+
+<p><strong>Default:</strong> 55676
+
+<p><strong>When to Change:</strong>
+<ul>
+<li>Port 55676 is already in use by another application
+<li>Firewall or security policy blocks port 55676
+<li>Testing multiple ZAP instances simultaneously
+</ul>
+
+<p><strong>Valid Range:</strong> 1-65535 (recommended: use ports above 1024 to avoid requiring admin privileges)
+
+<p><strong>Impact of Changing:</strong>
+<ul>
+<li>The export server will restart on the new port
+<li>The foxhound-profile will be updated with the new port
+<li><strong>You must relaunch Foxhound browser</strong> for the new settings to take effect
+<li>Any currently running Foxhound browsers will continue using the old port
+</ul>
+
+<p><strong>Note:</strong> If you see "Port Already in Use" errors, refer to the <a href="troubleshooting.html">Troubleshooting</a> guide.
+
+<H2>Taint Cache Size</H2>
+<p>The taint cache size controls how many taint flows are kept in memory for fast access.
+
+<p><strong>Default:</strong> 1000 entries
+
+<p><strong>Range:</strong> 1 to 100,000 entries
+
+<p><strong>How It Works - LRU Cache:</strong>
+<ul>
+<li>Foxhound uses a Least Recently Used (LRU) cache strategy
+<li>The most recently accessed flows are kept in memory
+<li>When the cache exceeds the configured size, the least recently used flows are evicted
+<li>Evicted flows remain in the database and are loaded on-demand when accessed
+<li>All flows (cached or not) are persisted to the database immediately
+</ul>
+
+<p><strong>Memory vs. Database Trade-offs:</strong>
+<table border="2">
+<tr><th>Cache Size</th><th>Memory Usage</th><th>Performance</th><th>Use Case</th></tr>
+<tr><td>Small (100-500)</td><td>Low</td><td>Slower for many flows</td><td>Limited memory environments</td></tr>
+<tr><td>Medium (1000-5000)</td><td>Moderate</td><td>Balanced</td><td>Most users (default)</td></tr>
+<tr><td>Large (10000-50000)</td><td>High</td><td>Fast for high-volume</td><td>Intensive testing sessions</td></tr>
+<tr><td>Very Large (50000+)</td><td>Very High</td><td>Fastest, may impact ZAP</td><td>Advanced users only</td></tr>
+</table>
+
+<p><strong>Tuning Guidelines:</strong>
+<ul>
+<li>Monitor memory usage: Larger cache uses more RAM (roughly 1-2 KB per taint flow)
+<li>If ZAP becomes sluggish with many flows, increase cache size
+<li>If memory is constrained, decrease cache size
+<li>For high-traffic testing, start with 5000 and adjust based on performance
+</ul>
+
+<p><strong>When to Clear Cache:</strong>
+<ul>
+<li>Use <strong>Clear All</strong> button in Foxhound panel to empty cache
+<li>Clears in-memory cache but not the database
+<li>Flows reload from database on ZAP restart
+</ul>
+
+<H2>Sources Configuration</H2>
+<p>The sources list controls which data origins Foxhound tracks.
+
+<p><strong>Enabled Sources:</strong> Foxhound marks data from these origins as tainted
+<p><strong>Disabled Sources:</strong> Foxhound ignores data from these origins
+
+<p><strong>Impact on Tracking:</strong>
+<ul>
+<li>Enabled sources: Data flows are tracked and sent to ZAP
+<li>Disabled sources: Data flows are not tracked, reducing overhead
+<li>Changes require relaunching Foxhound browser to take effect
+</ul>
+
+<p><strong>When to Disable Sources:</strong>
+<ul>
+<li>Reduce noise: Disable sources you're not interested in
+<li>Performance: Fewer sources = less tracking overhead
+<li>Focused testing: Enable only sources relevant to your test scenario
+</ul>
+
+<p><strong>Common Source Categories:</strong>
+<ul>
+<li><strong>URL Sources:</strong> location.*, document.URL, etc. (for DOM XSS testing)
+<li><strong>Storage Sources:</strong> localStorage, sessionStorage, document.cookie (for stored XSS)
+<li><strong>Network Sources:</strong> XMLHttpRequest, fetch responses (for response-based attacks)
+<li><strong>Input Sources:</strong> Form inputs, textareas (for input validation testing)
+</ul>
+
+<p><strong>Recommendation:</strong> Start with all sources enabled, then disable noisy ones as needed.
+
+<H2>Sinks Configuration</H2>
+<p>The sinks list controls which dangerous operations Foxhound monitors for tainted data.
+
+<p><strong>Enabled Sinks:</strong> Foxhound reports when tainted data reaches these operations
+<p><strong>Disabled Sinks:</strong> Foxhound ignores these operations
+
+<p><strong>Impact on Detection:</strong>
+<ul>
+<li>Enabled sinks: Taint flows ending at these sinks are reported
+<li>Disabled sinks: Taint flows ending at these sinks are NOT reported
+<li>Disabling sinks does not prevent tracking, only reporting
+<li>Changes require relaunching Foxhound browser to take effect
+</ul>
+
+<p><strong>When to Disable Sinks:</strong>
+<ul>
+<li>Focus on specific vulnerability types (e.g., disable storage sinks if only testing XSS)
+<li>Reduce false positives: Disable sinks that frequently fire in the application
+<li>Performance: Fewer sinks = less reporting overhead
+</ul>
+
+<p><strong>Common Sink Categories:</strong>
+<ul>
+<li><strong>Code Execution:</strong> eval, Function, setTimeout, setInterval (highest risk)
+<li><strong>DOM Manipulation:</strong> innerHTML, outerHTML, document.write
+<li><strong>URL Navigation:</strong> location.href, window.open
+<li><strong>Storage Operations:</strong> localStorage.setItem, document.cookie
+<li><strong>Network Operations:</strong> fetch, XMLHttpRequest.open
+</ul>
+
+<p><strong>Warning:</strong> Disabling critical sinks (eval, innerHTML) may cause you to miss important vulnerabilities.
+
+<p><strong>Recommendation:</strong> Keep all sinks enabled unless you have a specific reason to disable them.
+
+<H2>Selenium Profile Integration</H2>
+<p>Foxhound automatically manages a Firefox profile named "foxhound-profile" with taint tracking preferences.
+
+<p><strong>Profile Location:</strong>
+<ul>
+<li><strong>Windows:</strong> <code>%USERPROFILE%\.ZAP\firefox\foxhound-profile\</code>
+<li><strong>Linux:</strong> <code>~/.ZAP/firefox/foxhound-profile/</code>
+<li><strong>Mac:</strong> <code>~/Library/Application Support/ZAP/firefox/foxhound-profile/</code>
+</ul>
+
+<p><strong>What Gets Written:</strong>
+<ul>
+<li><strong>user.js</strong> - Firefox preferences file with:
+  <ul>
+  <li>Export URL: <code>http://localhost:[port]</code>
+  <li>Enabled sources list
+  <li>Enabled sinks list
+  <li>Other taint tracking configuration
+  </ul>
+<li>Profile is created on first launch
+<li>Profile is updated whenever options change
+</ul>
+
+<p><strong>Manual Profile Management:</strong>
+<ul>
+<li>Usually not needed - ZAP manages the profile automatically
+<li>If profile becomes corrupted, delete the directory and ZAP will recreate it
+<li>You can view user.js to see the generated preferences
+<li>Do not manually edit user.js - ZAP overwrites it on each launch
+</ul>
+
+<H2>Applying Changes</H2>
+<p>Different settings take effect at different times:
+
+<table border="2">
+<tr><th>Setting</th><th>When Applied</th><th>Action Required</th></tr>
+<tr>
+    <td>Export Server Port</td>
+    <td>Immediately (server restarts)</td>
+    <td>Relaunch Foxhound browser</td>
+</tr>
+<tr>
+    <td>Taint Cache Size</td>
+    <td>Immediately</td>
+    <td>None (affects future operations)</td>
+</tr>
+<tr>
+    <td>Sources</td>
+    <td>On browser launch</td>
+    <td>Relaunch Foxhound browser</td>
+</tr>
+<tr>
+    <td>Sinks</td>
+    <td>On browser launch</td>
+    <td>Relaunch Foxhound browser</td>
+</tr>
+</table>
+
+<p><strong>Important:</strong> Always relaunch the Foxhound browser after changing sources, sinks, or the export server port.
+
+<H2>See Also</H2>
+<table>
+<tr>
+    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+    <td><a href="getting-started.html">Getting Started</a></td>
+    <td>for initial configuration</td>
+</tr>
+<tr>
+    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+    <td><a href="concepts.html">Core Concepts</a></td>
+    <td>for understanding sources and sinks</td>
+</tr>
+<tr>
+    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+    <td><a href="database.html">Database &amp; Cache</a></td>
+    <td>for cache architecture details</td>
+</tr>
+<tr>
+    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+    <td><a href="selenium.html">Selenium Integration</a></td>
+    <td>for profile management details</td>
+</tr>
+<tr>
+    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+    <td><a href="troubleshooting.html">Troubleshooting</a></td>
+    <td>for common configuration issues</td>
+</tr>
+</table>
+
+</BODY>
+</HTML>

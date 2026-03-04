@@ -1,0 +1,23 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<!DOCTYPE toc
+  PUBLIC "-//Sun Microsystems Inc.//DTD JavaHelp TOC Version 2.0//EN"
+         "http://java.sun.com/products/javahelp/toc_2_0.dtd">
+
+<toc version="2.0">
+    <tocitem text="ZAP User Guide" tocid="toplevelitem">
+        <tocitem text="Add Ons" tocid="addons">
+            <tocitem text="Foxhound" image="addon.foxhound.icon" target="addon.foxhound.intro">
+                <tocitem text="Core Concepts" target="addon.foxhound.concepts" />
+                <tocitem text="Getting Started" target="addon.foxhound.gettingstarted" />
+                <tocitem text="Foxhound Panel" target="addon.foxhound.panel" />
+                <tocitem text="Options" target="addon.foxhound.options" />
+                <tocitem text="Alerts" target="addon.foxhound.alerts" />
+                <tocitem text="Database &amp; Cache" target="addon.foxhound.database" />
+                <tocitem text="Selenium Integration" target="addon.foxhound.selenium" />
+                <tocitem text="Troubleshooting" target="addon.foxhound.troubleshooting" />
+                <tocitem text="API" target="addon.foxhound.api" />
+                <tocitem text="About" target="addon.foxhound.about" />
+            </tocitem>
+        </tocitem>
+    </tocitem>
+</toc>

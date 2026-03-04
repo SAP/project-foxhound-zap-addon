@@ -1,0 +1,179 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<HTML>
+<HEAD>
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8">
+<TITLE>Foxhound Panel</TITLE>
+</HEAD>
+<BODY>
+<H1>Foxhound Panel</H1>
+
+<p>The Foxhound panel is the main interface for viewing and managing taint flows captured during browser sessions.
+
+<H2>Panel Location</H2>
+<p>The Foxhound panel is located in the Status panels area at the bottom of the ZAP window, alongside other panels like History and Search. Click the <strong>Foxhound</strong> tab to bring it into focus.
+
+<H2>Toolbar Buttons</H2>
+<p>The panel toolbar provides quick access to key functions:
+
+<h3>Launch Foxhound</h3>
+<p>The <strong>Launch Foxhound</strong> button opens a new Foxhound browser instance with taint tracking enabled. The browser is automatically configured to:
+<ul>
+<li>Use the foxhound-profile Firefox profile
+<li>Send taint flow data to ZAP's export server
+<li>Route traffic through ZAP's proxy
+<li>Track enabled sources and sinks
+</ul>
+
+<h3>Show Filter</h3>
+<p>The <strong>Show Filter</strong> button opens the filter dialog, allowing you to control which taint flows are displayed. See the Filtering section below for details.
+
+<h3>Clear All</h3>
+<p>The <strong>Clear All</strong> button removes all taint flows from the panel display and clears the in-memory cache. Note that this does not delete flows from the database - they will be reloaded when ZAP restarts.
+
+<H2>Tree Table Display</H2>
+<p>Taint flows are displayed in a hierarchical tree table with three levels:
+
+<h3>Level 1: TaintInfo (Parent)</h3>
+<p>The top level represents a complete taint flow from source to sink. Each TaintInfo row includes:
+<ul>
+<li><strong>ID</strong> - Unique identifier (e.g., 1, 2, 3...)
+<li><strong>Timestamp</strong> - When the flow was captured (e.g., "2025-03-04 14:23:45")
+<li><strong>URL</strong> - The page where the flow occurred
+<li><strong>Sink</strong> - The dangerous operation (e.g., "eval", "innerHTML", "document.write")
+<li><strong>Source</strong> - The data origin (e.g., "location.hash", "document.cookie")
+<li><strong>String</strong> - The complete tainted string flowing into the sink
+</ul>
+
+<h3>Level 2: TaintRange (Child)</h3>
+<p>Expand a TaintInfo row to see TaintRange entries. Each TaintRange represents a specific substring of the tainted data and shows:
+<ul>
+<li><strong>String</strong> - The substring that is tainted
+<li><strong>From/To</strong> - The character positions in the parent string (e.g., "0-15")
+<li>Other columns show aggregate information from the operation chain
+</ul>
+
+<h3>Level 3: TaintOperation (Leaf)</h3>
+<p>Expand a TaintRange to see individual TaintOperations in the data flow chain. Each operation shows:
+<ul>
+<li><strong>Flow</strong> - The operation type (e.g., "string_concat", "assign", "charCodeAt")
+<li><strong>Function</strong> - The JavaScript function where the operation occurred
+<li><strong>Location</strong> - The file path or URL of the source code
+<li><strong>Line</strong> - The line number in the source file
+<li><strong>Script Line</strong> - The line number in the script (if different from location line)
+</ul>
+
+<p><strong>Example hierarchy:</strong>
+<pre>
+TaintInfo #1: eval() called with data from location.hash
+  ├─ TaintRange: "alert('xss')" (positions 0-13)
+  │  ├─ Operation 1: string_concat at file.js:42
+  │  ├─ Operation 2: assign at file.js:45
+  │  └─ Operation 3: eval at file.js:50
+  └─ TaintRange: "xss" (positions 7-10)
+     └─ Operation 1: substring at file.js:43
+</pre>
+
+<H2>Column Descriptions</H2>
+<table border="2">
+<tr><th>Column</th><th>Description</th></tr>
+<tr><td>Taint Flow</td><td>Tree control for expanding/collapsing hierarchy</td></tr>
+<tr><td>ID</td><td>Unique identifier for the TaintInfo (top level only)</td></tr>
+<tr><td>Timestamp</td><td>When the taint flow was captured (top level only)</td></tr>
+<tr><td>URL</td><td>The page URL where the flow occurred (top level only)</td></tr>
+<tr><td>Sink</td><td>The dangerous operation receiving tainted data (top level only)</td></tr>
+<tr><td>Source</td><td>Where the tainted data originated (top level only)</td></tr>
+<tr><td>String flowing into sink</td><td>The tainted data (visible at TaintInfo and TaintRange levels)</td></tr>
+<tr><td>Flow</td><td>The operation type (TaintOperation level only)</td></tr>
+<tr><td>Function</td><td>JavaScript function containing the operation (TaintOperation level)</td></tr>
+<tr><td>Location</td><td>Source file path or URL (TaintOperation level)</td></tr>
+<tr><td>Line</td><td>Line number in source (TaintOperation level)</td></tr>
+<tr><td>Script Line</td><td>Script line number (TaintOperation level)</td></tr>
+<tr><td>From</td><td>Start position of tainted substring (TaintRange level)</td></tr>
+<tr><td>To</td><td>End position of tainted substring (TaintRange level)</td></tr>
+<tr><td>Position</td><td>Character position (TaintOperation level, if applicable)</td></tr>
+</table>
+
+<H2>Filtering Taint Flows</H2>
+<p>Use the filter dialog to control which taint flows are displayed:
+
+<ol>
+<li>Click the <strong>Show Filter</strong> button in the toolbar
+<li>The filter dialog displays two lists:
+   <ul>
+   <li><strong>Sources</strong> - All available data sources (e.g., location.hash, document.cookie)
+   <li><strong>Sinks</strong> - All available dangerous operations (e.g., eval, innerHTML)
+   </ul>
+<li>Check the boxes next to sources/sinks you want to <strong>display</strong>
+<li>Uncheck boxes for sources/sinks you want to <strong>hide</strong>
+<li>Click <strong>OK</strong> to apply the filter
+<li>The tree table immediately updates to show only matching flows
+</ol>
+
+<p><strong>Note:</strong> Filtering only affects the panel display. All taint flows remain stored in the database and cache.
+
+<p><strong>Use cases for filtering:</strong>
+<ul>
+<li>Focus on specific vulnerability types (e.g., show only eval sinks for JavaScript injection)
+<li>Exclude noisy sources (e.g., hide localStorage flows)
+<li>Investigate specific attack vectors (e.g., URL-based sources only)
+</ul>
+
+<H2>Footer Counter</H2>
+<p>The panel footer displays <strong>"Foxhound Taint Flows: N"</strong> where N is the current count of visible flows. This count:
+<ul>
+<li>Updates in real-time as new flows arrive
+<li>Reflects the filtered view (not the total in the database)
+<li>Resets to 0 when Clear All is clicked
+<li>Restores the full count when ZAP reopens the database
+</ul>
+
+<H2>Interacting with Flows</H2>
+
+<h3>Expanding and Collapsing</h3>
+<ul>
+<li>Click the tree control icon (+ or -) to expand or collapse rows
+<li>Double-click a row to toggle expansion
+<li>Expand TaintInfo to see TaintRanges, expand TaintRanges to see TaintOperations
+</ul>
+
+<h3>Sorting</h3>
+<ul>
+<li>Click column headers to sort the table
+<li>Click again to reverse sort order
+<li>Sorting applies to the current hierarchy level
+</ul>
+
+<h3>Selecting Rows</h3>
+<ul>
+<li>Click a row to select it
+<li>Selected rows are highlighted
+<li>Use Shift+Click to select multiple contiguous rows
+<li>Use Ctrl+Click (Cmd+Click on Mac) to select multiple non-contiguous rows
+</ul>
+
+<H2>See Also</H2>
+<table>
+<tr>
+    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+    <td><a href="getting-started.html">Getting Started</a></td>
+    <td>for initial setup instructions</td>
+</tr>
+<tr>
+    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+    <td><a href="concepts.html">Core Concepts</a></td>
+    <td>for understanding taint flows, sources, and sinks</td>
+</tr>
+<tr>
+    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+    <td><a href="options.html">Options</a></td>
+    <td>for configuration settings</td>
+</tr>
+<tr>
+    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+    <td><a href="alerts.html">Alerts</a></td>
+    <td>for vulnerability detection</td>
+</tr>
+</table>
+
+</BODY>
+</HTML>

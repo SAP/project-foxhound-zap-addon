@@ -1,0 +1,206 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<HTML>
+<HEAD>
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8">
+<TITLE>API</TITLE>
+</HEAD>
+<BODY>
+<H1>API</H1>
+
+<p><strong>Note:</strong> ZAP API support for the Foxhound add-on is currently under development. This page serves as a placeholder for future API documentation.
+
+<H2>Overview</H2>
+
+<p>In future releases, the Foxhound add-on will provide a ZAP API for programmatic access to taint flow data and configuration.
+
+<p>The API will allow you to:
+<ul>
+<li>Query taint flows programmatically
+<li>Configure sources and sinks
+<li>Control the export server
+<li>Clear taint flow data
+<li>Access taint flow statistics
+<li>Integrate Foxhound with automated testing pipelines
+</ul>
+
+<H2>Planned API Endpoints</H2>
+
+<p>The following API endpoints are planned for future implementation:
+
+<h3>Views (Read-Only)</h3>
+<table border="2">
+<tr><th>Endpoint</th><th>Description</th></tr>
+<tr><td>/foxhound/view/taintFlows/</td><td>List all taint flows</td></tr>
+<tr><td>/foxhound/view/taintFlow/</td><td>Get details of a specific taint flow by ID</td></tr>
+<tr><td>/foxhound/view/flowCount/</td><td>Get total number of taint flows</td></tr>
+<tr><td>/foxhound/view/sources/</td><td>List all available sources</td></tr>
+<tr><td>/foxhound/view/sinks/</td><td>List all available sinks</td></tr>
+<tr><td>/foxhound/view/options/</td><td>Get current Foxhound options</td></tr>
+<tr><td>/foxhound/view/serverPort/</td><td>Get export server port</td></tr>
+<tr><td>/foxhound/view/cacheSize/</td><td>Get configured cache size</td></tr>
+</table>
+
+<h3>Actions (Modify State)</h3>
+<table border="2">
+<tr><th>Endpoint</th><th>Description</th></tr>
+<tr><td>/foxhound/action/clearAll/</td><td>Clear all taint flows from cache</td></tr>
+<tr><td>/foxhound/action/setServerPort/</td><td>Set export server port</td></tr>
+<tr><td>/foxhound/action/setCacheSize/</td><td>Set taint cache size</td></tr>
+<tr><td>/foxhound/action/enableSource/</td><td>Enable a specific source</td></tr>
+<tr><td>/foxhound/action/disableSource/</td><td>Disable a specific source</td></tr>
+<tr><td>/foxhound/action/enableSink/</td><td>Enable a specific sink</td></tr>
+<tr><td>/foxhound/action/disableSink/</td><td>Disable a specific sink</td></tr>
+</table>
+
+<H2>API Access Methods</H2>
+
+<p>Once implemented, the Foxhound API will be accessible via:
+<ul>
+<li><strong>REST API:</strong> HTTP requests to ZAP's API endpoint
+<li><strong>Python Client:</strong> Using the ZAP Python API client
+<li><strong>Java Client:</strong> Using the ZAP Java API client
+<li><strong>Other Clients:</strong> JavaScript, Ruby, PHP, etc.
+</ul>
+
+<H2>Example Usage (Future)</H2>
+
+<p>Example API usage once implemented:
+
+<h3>REST API</h3>
+<pre>
+# Get all taint flows
+GET http://localhost:8080/JSON/foxhound/view/taintFlows/
+
+# Get specific taint flow
+GET http://localhost:8080/JSON/foxhound/view/taintFlow/?id=123
+
+# Clear all flows
+GET http://localhost:8080/JSON/foxhound/action/clearAll/
+
+# Set server port
+GET http://localhost:8080/JSON/foxhound/action/setServerPort/?port=55677
+</pre>
+
+<h3>Python Client</h3>
+<pre>
+from zapv2 import ZAPv2
+
+zap = ZAPv2()
+
+# Get all taint flows
+flows = zap.foxhound.taint_flows()
+
+# Get specific flow
+flow = zap.foxhound.taint_flow(id='123')
+
+# Clear all flows
+zap.foxhound.clear_all()
+
+# Configure options
+zap.foxhound.set_server_port(55677)
+zap.foxhound.set_cache_size(5000)
+</pre>
+
+<h3>Java Client</h3>
+<pre>
+ClientApi api = new ClientApi("localhost", 8080);
+
+// Get all taint flows
+ApiResponse flows = api.foxhound.taintFlows();
+
+// Clear all flows
+api.foxhound.clearAll();
+
+// Configure options
+api.foxhound.setServerPort("55677");
+api.foxhound.setCacheSize("5000");
+</pre>
+
+<H2>Programmatic Access (Current)</H2>
+
+<p>Until the ZAP API is implemented, you can access Foxhound functionality programmatically within ZAP extensions:
+
+<h3>Accessing TaintInfoStore</h3>
+<pre>
+// Get TaintInfoStore instance
+ExtensionFoxhound extension =
+    Control.getSingleton().getExtensionLoader()
+        .getExtension(ExtensionFoxhound.class);
+TaintInfoStore store = extension.getTaintInfoStore();
+
+// Query taint flows
+TaintInfo flow = store.get(id);
+Collection&lt;TaintInfo&gt; allFlows = store.values();
+
+// Add listeners
+extension.getEventPublisher().addEventListener(myListener);
+</pre>
+
+<h3>Accessing Configuration</h3>
+<pre>
+// Get FoxhoundOptions
+FoxhoundOptions options = extension.getFoxhoundOptions();
+
+// Read settings
+int port = options.getExportServerPort();
+int cacheSize = options.getTaintCacheSize();
+
+// Modify settings (persists to ZAP config)
+options.setExportServerPort(55677);
+options.setTaintCacheSize(5000);
+</pre>
+
+<H2>Development Status</H2>
+
+<p>API development is tracked in the GitHub repository:
+<ul>
+<li>Check the issue tracker for API-related issues
+<li>Contribute to API design discussions
+<li>Submit pull requests for API implementation
+<li>Repository: <a href="https://github.com/SAP/project-foxhound-zap-addon">https://github.com/SAP/project-foxhound-zap-addon</a>
+</ul>
+
+<H2>Future Enhancements</H2>
+
+<p>Potential future API features:
+<ul>
+<li><strong>Filtering:</strong> Query taint flows by source, sink, URL, time range
+<li><strong>Export:</strong> Export taint flows to JSON, CSV, or XML
+<li><strong>Import:</strong> Import previously exported taint flows
+<li><strong>Statistics:</strong> Aggregate statistics on flow types, volumes, trends
+<li><strong>Webhooks:</strong> Real-time notifications when flows detected
+<li><strong>Batch Operations:</strong> Bulk enable/disable sources and sinks
+</ul>
+
+<H2>Contributing</H2>
+
+<p>If you're interested in contributing to API development:
+<ol>
+<li>Review the <a href="https://github.com/SAP/project-foxhound-zap-addon/blob/main/CONTRIBUTING.md">Contributing Guide</a>
+<li>Check for open API-related issues
+<li>Propose API design improvements
+<li>Submit pull requests with API implementations
+<li>Test API endpoints and provide feedback
+</ol>
+
+<H2>See Also</H2>
+<table>
+<tr>
+    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+    <td><a href="intro.html">Foxhound Overview</a></td>
+    <td>for introduction</td>
+</tr>
+<tr>
+    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+    <td><a href="about.html">About</a></td>
+    <td>for project information and contributing</td>
+</tr>
+<tr>
+    <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+    <td><a href="panel.html">Foxhound Panel</a></td>
+    <td>for UI-based access to taint flows</td>
+</tr>
+</table>
+
+</BODY>
+</HTML>
