@@ -289,6 +289,10 @@ public class TaintInfoStore {
                         break;
                     }
                     memoryCache.put(taintInfo.getId(), new CachedTaintInfo(taintInfo));
+
+                    // Publish event to notify UI listeners
+                    FoxhoundEventPublisher.publishEvent(
+                            FoxhoundEventPublisher.TAINT_INFO_CREATED, taintInfo, null);
                 }
             } finally {
                 cacheLock.writeLock().unlock();
