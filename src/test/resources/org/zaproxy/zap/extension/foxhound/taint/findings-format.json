@@ -1,0 +1,128 @@
+{
+  "findings": [
+    {
+      "detail": {
+        "subframe": false,
+        "loc": "https://example.com/test1",
+        "parentloc": "https://example.com/test1",
+        "referrer": "https://example.com/",
+        "str": "Test <b>data1</b>",
+        "sink": "innerHTML",
+        "stack": {},
+        "timestamp": 1764881474542
+      },
+      "taint": [
+        {
+          "begin": 5,
+          "end": 10,
+          "flow": [
+            {
+              "operation": "function",
+              "builtin": false,
+              "source": false,
+              "location": {
+                "filename": "https://example.com/test1",
+                "function": "",
+                "line": 10,
+                "pos": 5,
+                "scriptline": 10,
+                "scripthash": "abc123"
+              },
+              "arguments": ["ReportTaintSink", "test.js:1", "0", "1"]
+            },
+            {
+              "operation": "innerHTML",
+              "builtin": true,
+              "source": false,
+              "location": {
+                "filename": "https://example.com/test1",
+                "function": "",
+                "line": 10,
+                "pos": 5,
+                "scriptline": 10,
+                "scripthash": "abc123"
+              },
+              "arguments": ["//div[@id='test']"]
+            },
+            {
+              "operation": "location.hash",
+              "builtin": true,
+              "source": true,
+              "location": {
+                "filename": "https://example.com/test1",
+                "function": "",
+                "line": 8,
+                "pos": 10,
+                "scriptline": 8,
+                "scripthash": "abc123"
+              },
+              "arguments": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "detail": {
+        "subframe": false,
+        "loc": "https://example.com/test2",
+        "parentloc": "https://example.com/test2",
+        "referrer": "https://example.com/",
+        "str": "Another <script>alert(2)</script>",
+        "sink": "eval",
+        "stack": {},
+        "timestamp": 1764881474600
+      },
+      "taint": [
+        {
+          "begin": 8,
+          "end": 15,
+          "flow": [
+            {
+              "operation": "function",
+              "builtin": false,
+              "source": false,
+              "location": {
+                "filename": "https://example.com/test2",
+                "function": "",
+                "line": 20,
+                "pos": 10,
+                "scriptline": 20,
+                "scripthash": "def456"
+              },
+              "arguments": ["ReportTaintSink", "test2.js:1", "0", "1"]
+            },
+            {
+              "operation": "eval",
+              "builtin": true,
+              "source": false,
+              "location": {
+                "filename": "https://example.com/test2",
+                "function": "",
+                "line": 20,
+                "pos": 10,
+                "scriptline": 20,
+                "scripthash": "def456"
+              },
+              "arguments": []
+            },
+            {
+              "operation": "document.cookie",
+              "builtin": true,
+              "source": true,
+              "location": {
+                "filename": "https://example.com/test2",
+                "function": "",
+                "line": 18,
+                "pos": 5,
+                "scriptline": 18,
+                "scripthash": "def456"
+              },
+              "arguments": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

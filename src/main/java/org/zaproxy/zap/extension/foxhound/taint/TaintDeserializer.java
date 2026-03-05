@@ -46,8 +46,26 @@ public class TaintDeserializer {
     }
 
     public static TaintInfo deserializeTaintInfo(String jsonString) throws JSONException {
-        TaintInfo taint = new TaintInfo();
         JSONObject jsonObject = JSONObject.fromObject(jsonString);
+
+        // Check if this is the new format with "findings" key
+        if (jsonObject.has("findings")) {
+            JSONArray findings = jsonObject.getJSONArray("findings");
+            if (findings.isEmpty()) {
+                return null;
+            }
+            // For backwards compatibility, return the first finding
+            // Use deserializeSingleTaintInfo for the actual parsing
+            return deserializeSingleTaintInfo(findings.getJSONObject(0));
+        }
+
+        // Original format: single taint flow
+        return deserializeSingleTaintInfo(jsonObject);
+    }
+
+    private static TaintInfo deserializeSingleTaintInfo(JSONObject jsonObject)
+            throws JSONException {
+        TaintInfo taint = new TaintInfo();
 
         JSONObject detailObject = jsonObject.getJSONObject("detail");
 
@@ -137,9 +155,46 @@ public class TaintDeserializer {
         }
 
         if (taint != null) {
-            LOGGER.debug("Deserialized flow: {}", taint);
+            LOGGER.info("Deserialized flow: {}", taint);
         }
 
         return taint;
+    }
+
+    /**
+     * Deserializes all TaintInfo objects from a JSON string. Handles both formats: - Single taint
+     * flow object - Object with "findings" key containing a list of taint flows
+     *
+     * @param jsonString JSON string to deserialize
+     * @return List of TaintInfo objects, never null but may be empty
+     * @throws JSONException if JSON parsing fails
+     */
+    public static java.util.List<TaintInfo> deserializeAllTaintInfo(String jsonString)
+            throws JSONException {
+        java.util.List<TaintInfo> results = new java.util.ArrayList<>();
+        JSONObject jsonObject = JSONObject.fromObject(jsonString);
+
+        // Check if this is the new format with "findings" key
+        if (jsonObject.has("findings")) {
+            JSONArray findings = jsonObject.getJSONArray("findings");
+            for (int i = 0, size = findings.size(); i < size; i++) {
+                try {
+                    TaintInfo taint = deserializeSingleTaintInfo(findings.getJSONObject(i));
+                    if (taint != null) {
+                        results.add(taint);
+                    }
+                } catch (JSONException e) {
+                    LOGGER.warn("Failed to deserialize finding at index {}: {}", i, e.getMessage());
+                }
+            }
+        } else {
+            // Original format: single taint flow
+            TaintInfo taint = deserializeSingleTaintInfo(jsonObject);
+            if (taint != null) {
+                results.add(taint);
+            }
+        }
+
+        return results;
     }
 }
