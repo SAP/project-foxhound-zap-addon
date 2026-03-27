@@ -78,7 +78,7 @@ spotless {
 
 dependencies {
     compileOnly("org.zaproxy:zap:2.17.0")
-    compileOnly("org.zaproxy.addon:commonlib:1.36.0")
+    compileOnly("org.zaproxy.addon:commonlib:1.40.0")
     compileOnly("org.zaproxy.addon:network:0.1.0")
     // Snapshot version includes support for custom browsers
     compileOnly("org.zaproxy.addon:selenium:15.45.0-SNAPSHOT")
