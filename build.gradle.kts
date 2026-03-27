@@ -39,7 +39,7 @@ zapAddOn {
                     version.set(">=0.1.0")
                 }
                 register("commonlib") {
-                    version.set(">= 1.36.0 & < 2.0.0")
+                    version.set(">= 1.40.0 & < 2.0.0")
                 }
                 register("pscan") {
                     version.set(">= 0.2.0 & < 1.0.0")

@@ -42,6 +42,7 @@ public class FoxhoundStoredXssCheck extends FoxhoundBaseCheck {
         Map<String, String> alertTags =
                 new HashMap<>(
                         CommonAlertTag.toMap(
+                                CommonAlertTag.OWASP_2025_A05_INJECTION,
                                 CommonAlertTag.OWASP_2021_A03_INJECTION,
                                 CommonAlertTag.OWASP_2017_A07_XSS,
                                 CommonAlertTag.WSTG_V42_INPV_02_STORED_XSS,
