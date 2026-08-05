@@ -81,7 +81,7 @@ dependencies {
     compileOnly("org.zaproxy.addon:commonlib:1.40.0")
     compileOnly("org.zaproxy.addon:network:0.1.0")
     // Snapshot version includes support for custom browsers
-    compileOnly("org.zaproxy.addon:selenium:15.45.0-SNAPSHOT")
+    compileOnly("org.zaproxy.addon:selenium:15.49.0")
     compileOnly("org.zaproxy.addon:pscan:0.2.0")
     testImplementation(platform("org.junit:junit-bom:6.0.2"))
     testImplementation("org.junit.jupiter:junit-jupiter")
