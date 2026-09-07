@@ -144,7 +144,7 @@ public class FoxhoundPanel extends AbstractPanel implements EventConsumer {
             clearAllButton.setIcon(DELETE_ICON);
             clearAllButton.addActionListener(
                     e -> {
-                        extension.getTaintStore().clearAll();
+                        extension.getTaintStore().clear();
                     });
         }
         return clearAllButton;

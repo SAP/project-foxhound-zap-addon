@@ -36,6 +36,9 @@ This file can be installed by opening ZAP:
 File -> Load Add-on File -> Choose ZAP file
 ```
 
+### Testing
+Check here https://foxhound.ias.tu-bs.de/bheu25/demo/ for some test examples which contain dangerous data flows!
+
 ## Support, Feedback, Contributing
 
 This project is open to feature requests/suggestions, bug reports etc. via [GitHub issues](https://github.com/SAP/project-foxhound-zap-addon/issues). Contribution and feedback are encouraged and always welcome. For more information about how to contribute, the project structure, as well as additional contribution information, see our [Contribution Guidelines](CONTRIBUTING.md).

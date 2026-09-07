@@ -19,57 +19,348 @@
  */
 package org.zaproxy.zap.extension.foxhound.db;
 
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.zaproxy.zap.extension.foxhound.FoxhoundEventPublisher;
 import org.zaproxy.zap.extension.foxhound.taint.TaintDeserializer;
 import org.zaproxy.zap.extension.foxhound.taint.TaintInfo;
 
+/**
+ * Storage for TaintInfo objects with database persistence and LRU memory caching. This class
+ * maintains a two-tier architecture: - Tier 1: Hot LRU cache in memory for fast access - Tier 2:
+ * Complete dataset in database for persistence
+ *
+ * <p>All additions are immediately persisted to the database (write-through cache). Items are
+ * loaded from the database on-demand when not in the memory cache.
+ */
 public class TaintInfoStore {
+    private static final Logger LOGGER = LogManager.getLogger(TaintInfoStore.class);
+    private static final int DEFAULT_CACHE_SIZE = 1000;
 
-    private Map<Integer, TaintInfo> taintInfoList = new ConcurrentHashMap<>();
-    ;
-    private int nextInt = 0;
+    private final Map<Integer, CachedTaintInfo> memoryCache = new ConcurrentHashMap<>();
+    private final TaintInfoTable dbTable;
+    private final AtomicInteger nextId = new AtomicInteger(0);
+    private final int maxCacheSize;
+    private final ReentrantReadWriteLock cacheLock = new ReentrantReadWriteLock();
+    private boolean initialized = false;
 
-    public TaintInfoStore() {}
+    public TaintInfoStore() {
+        this(DEFAULT_CACHE_SIZE);
+    }
 
+    public TaintInfoStore(int maxCacheSize) {
+        this.maxCacheSize = maxCacheSize;
+        this.dbTable = new TaintInfoTable();
+    }
+
+    /**
+     * Get the database table instance.
+     *
+     * @return The TaintInfoTable
+     */
+    public TaintInfoTable getTable() {
+        return dbTable;
+    }
+
+    /** Initialize the store for use. */
+    public void init() {
+        initialized = true;
+        LOGGER.info(
+                "TaintInfoStore initialized (database setup will occur in extension's databaseOpen())");
+    }
+
+    /** Clear all data from both memory and persistent storage. */
+    public void clear() {
+        // Clear database
+        if (initialized && dbTable.isInitialized()) {
+            try {
+                dbTable.deleteAll();
+                LOGGER.info("Cleared TaintInfo from database");
+            } catch (SQLException e) {
+                LOGGER.error("Failed to clear database", e);
+            }
+        }
+
+        // Clear memory cache
+        clearMemoryCache();
+    }
+
+    /**
+     * Clear only the memory cache, preserving database. Used when switching sessions - ZAP
+     * automatically switches database files, so we just need to clear stale cached data.
+     */
+    public void clearCache() {
+        clearMemoryCache();
+    }
+
+    /** Clear the memory cache. Database records are preserved. */
+    private void clearMemoryCache() {
+        cacheLock.writeLock().lock();
+        try {
+            int size = memoryCache.size();
+            memoryCache.clear();
+            LOGGER.info("Cleared {} TaintInfo objects from memory cache", size);
+        } finally {
+            cacheLock.writeLock().unlock();
+        }
+        FoxhoundEventPublisher.publishClearEvent();
+    }
+
+    /** Clear all TaintInfo from both memory cache and database. @deprecated Use clear() instead */
+    @Deprecated
+    public void clearAll() {
+        clear();
+    }
+
+    /**
+     * Add a TaintInfo to the store. Immediately persists to database and adds to memory cache.
+     *
+     * @param taintInfo The TaintInfo to add
+     */
     public void addTaintInfo(TaintInfo taintInfo) {
         try {
+            // Assign ID if needed
             if (taintInfo.getId() < 0) {
-                taintInfo.setId(nextInt++);
+                taintInfo.setId(nextId.getAndIncrement());
             }
-            taintInfoList.put(taintInfo.getId(), taintInfo);
+
+            // Persist to database (write-through cache)
+            // Only attempt if both initialized and table is ready (reconnect has been called)
+            if (initialized && dbTable.isInitialized()) {
+                try {
+                    dbTable.insert(taintInfo);
+                } catch (SQLException e) {
+                    LOGGER.error("Failed to persist TaintInfo to database", e);
+                    // Continue with memory cache even if DB fails (graceful degradation)
+                }
+            } else if (initialized && !dbTable.isInitialized()) {
+                LOGGER.debug(
+                        "Database not yet ready, storing TaintInfo {} in memory only",
+                        taintInfo.getId());
+            }
+
+            // Add to memory cache
+            cacheLock.writeLock().lock();
+            try {
+                memoryCache.put(taintInfo.getId(), new CachedTaintInfo(taintInfo));
+                evictIfNeeded();
+            } finally {
+                cacheLock.writeLock().unlock();
+            }
+
         } finally {
+            // Always publish event
             FoxhoundEventPublisher.publishEvent(
                     FoxhoundEventPublisher.TAINT_INFO_CREATED, taintInfo, null);
         }
     }
 
-    public void clearAll() {
-        taintInfoList.clear();
-        FoxhoundEventPublisher.publishClearEvent();
-    }
-
+    /**
+     * Get a TaintInfo by ID. Checks memory cache first, then loads from database if needed.
+     *
+     * @param id The TaintInfo ID
+     * @return The TaintInfo or null if not found
+     */
     public TaintInfo getTaintInfo(int id) {
-        return taintInfoList.get(id);
-    }
+        // Check memory cache first
+        cacheLock.readLock().lock();
+        try {
+            CachedTaintInfo cached = memoryCache.get(id);
+            if (cached != null) {
+                return cached.getTaintInfo(); // Updates access time
+            }
+        } finally {
+            cacheLock.readLock().unlock();
+        }
 
-    public List<TaintInfo> getFilteredTaintInfos(TaintInfoFilter filter) {
-        List<TaintInfo> filteredList = new ArrayList<>();
-        for (TaintInfo t : taintInfoList.values()) {
-            if (filter.matches(t)) {
-                filteredList.add(t);
+        // Not in cache, try loading from database
+        if (initialized && dbTable.isInitialized()) {
+            try {
+                TaintInfo fromDb = dbTable.read(id);
+                if (fromDb != null) {
+                    // Add to cache
+                    cacheLock.writeLock().lock();
+                    try {
+                        memoryCache.put(id, new CachedTaintInfo(fromDb));
+                        evictIfNeeded();
+                    } finally {
+                        cacheLock.writeLock().unlock();
+                    }
+                    return fromDb;
+                }
+            } catch (SQLException e) {
+                LOGGER.error("Failed to load TaintInfo from database", e);
             }
         }
-        return filteredList;
+
+        return null;
     }
 
+    /**
+     * Get filtered TaintInfo objects. Uses database query for efficient filtering.
+     *
+     * @param filter The filter to apply
+     * @return List of matching TaintInfo objects
+     */
+    public List<TaintInfo> getFilteredTaintInfos(TaintInfoFilter filter) {
+        if (initialized && dbTable.isInitialized()) {
+            try {
+                // Use database query for filtering
+                return dbTable.readFiltered(filter);
+            } catch (SQLException e) {
+                LOGGER.error("Failed to filter TaintInfo from database", e);
+                // Fallback to in-memory filtering
+            }
+        }
+
+        // Fallback: filter from memory cache
+        return fallbackMemoryFilter(filter);
+    }
+
+    /**
+     * Deserialize a JSON string and add the TaintInfo to the store.
+     *
+     * @param s JSON string
+     */
     public void deserializeAndAddTaintInfo(String s) {
         TaintInfo info = TaintDeserializer.deserializeTaintInfo(s);
         if (info != null) {
             addTaintInfo(info);
         }
+    }
+
+    /**
+     * Evict least recently used entry if cache size exceeds maximum. Assumes write lock is held.
+     */
+    private void evictIfNeeded() {
+        if (memoryCache.size() > maxCacheSize) {
+            // Find LRU entry
+            Map.Entry<Integer, CachedTaintInfo> lru = null;
+            long oldestTime = Long.MAX_VALUE;
+
+            for (Map.Entry<Integer, CachedTaintInfo> entry : memoryCache.entrySet()) {
+                long accessTime = entry.getValue().getLastAccessTime();
+                if (accessTime < oldestTime) {
+                    oldestTime = accessTime;
+                    lru = entry;
+                }
+            }
+
+            if (lru != null) {
+                memoryCache.remove(lru.getKey());
+                LOGGER.debug("Evicted TaintInfo {} from cache", lru.getKey());
+            }
+        }
+    }
+
+    /** Load the maximum ID from database to continue ID sequence. */
+    public void loadMaxIdFromDb() {
+        try {
+            int maxId = dbTable.getMaxId();
+            nextId.set(maxId + 1);
+            LOGGER.debug("Loaded max ID from database: {}", maxId);
+        } catch (SQLException e) {
+            LOGGER.warn("Failed to load max ID from database, starting from 0", e);
+            nextId.set(0);
+        }
+    }
+
+    /** Load all TaintInfo objects from the database into the memory cache on startup. */
+    public void loadFromDatabase() {
+        try {
+            List<TaintInfo> allTaintInfos = dbTable.readAll();
+            LOGGER.info("Loading {} TaintInfo objects from database", allTaintInfos.size());
+
+            cacheLock.writeLock().lock();
+            try {
+                for (TaintInfo taintInfo : allTaintInfos) {
+                    // Load into cache (respecting cache size limit)
+                    if (memoryCache.size() >= maxCacheSize) {
+                        LOGGER.debug(
+                                "Cache full, stopped loading at {} items. Remaining items will be lazy-loaded.",
+                                memoryCache.size());
+                        break;
+                    }
+                    memoryCache.put(taintInfo.getId(), new CachedTaintInfo(taintInfo));
+
+                    // Publish event to notify UI listeners
+                    FoxhoundEventPublisher.publishEvent(
+                            FoxhoundEventPublisher.TAINT_INFO_CREATED, taintInfo, null);
+                }
+            } finally {
+                cacheLock.writeLock().unlock();
+            }
+
+            LOGGER.info(
+                    "Loaded {} TaintInfo objects into cache ({} total in database)",
+                    memoryCache.size(),
+                    allTaintInfos.size());
+        } catch (SQLException e) {
+            LOGGER.error("Failed to load TaintInfo objects from database", e);
+        }
+    }
+
+    /**
+     * Persist any in-memory data to the database. This is called when a new database is opened to
+     * ensure data collected before the database was ready is not lost.
+     */
+    public void flushToDatabase() {
+        if (!initialized || !dbTable.isInitialized()) {
+            LOGGER.debug("Database not ready, skipping flush");
+            return;
+        }
+
+        cacheLock.readLock().lock();
+        try {
+            int flushed = 0;
+            for (CachedTaintInfo cached : memoryCache.values()) {
+                TaintInfo taintInfo = cached.getTaintInfo();
+                try {
+                    // Check if this item exists in database
+                    TaintInfo existing = dbTable.read(taintInfo.getId());
+                    if (existing == null) {
+                        // Not in database, insert it
+                        dbTable.insert(taintInfo);
+                        flushed++;
+                    }
+                } catch (SQLException e) {
+                    LOGGER.error("Failed to flush TaintInfo {} to database", taintInfo.getId(), e);
+                }
+            }
+            if (flushed > 0) {
+                LOGGER.info("Flushed {} TaintInfo objects from memory to database", flushed);
+            }
+        } finally {
+            cacheLock.readLock().unlock();
+        }
+    }
+
+    /**
+     * Fallback method to filter from memory cache when database query fails.
+     *
+     * @param filter The filter to apply
+     * @return List of matching TaintInfo objects from memory
+     */
+    private List<TaintInfo> fallbackMemoryFilter(TaintInfoFilter filter) {
+        List<TaintInfo> filteredList = new ArrayList<>();
+        cacheLock.readLock().lock();
+        try {
+            for (CachedTaintInfo cached : memoryCache.values()) {
+                TaintInfo info = cached.getTaintInfo();
+                if (filter.matches(info)) {
+                    filteredList.add(info);
+                }
+            }
+        } finally {
+            cacheLock.readLock().unlock();
+        }
+        return filteredList;
     }
 }
