@@ -1,0 +1,62 @@
+{
+  "detail": {
+    "subframe": false,
+    "loc": "https://domgo.at/cxss/example/1?payload=abcd&sp=x#12345",
+    "parentloc": "https://domgo.at/cxss/example/1?payload=abcd&sp=x#12345",
+    "referrer": "https://domgo.at/cxss/intro",
+    "str": "Welcome <b>12345</b>!!",
+    "sink": "innerHTML",
+    "stack": {},
+    "timestamp": 1764881474542
+  },
+  "taint": [
+    {
+      "begin": 11,
+      "end": 16,
+      "flow": [
+        {
+          "operation": "function",
+          "builtin": false,
+          "source": false,
+          "location": {
+            "filename": "https://domgo.at/cxss/example/1?payload=abcd&sp=x#12345",
+            "function": "",
+            "line": 204,
+            "pos": 18,
+            "scriptline": 198,
+            "scripthash": "d7069063759edbf2dcf45741802bc405"
+          },
+          "arguments": ["ReportTaintSink", "taint_reporting.js:1", "0", "3"]
+        },
+        {
+          "operation": "innerHTML",
+          "builtin": true,
+          "source": false,
+          "location": {
+            "filename": "https://domgo.at/cxss/example/1?payload=abcd&sp=x#12345",
+            "function": "",
+            "line": 204,
+            "pos": 18,
+            "scriptline": 198,
+            "scripthash": "d7069063759edbf2dcf45741802bc405"
+          },
+          "arguments": ["//xhtml:div[@id='msgboard']"]
+        },
+        {
+          "operation": "location.hash",
+          "builtin": true,
+          "source": true,
+          "location": {
+            "filename": "https://domgo.at/cxss/example/1?payload=abcd&sp=x#12345",
+            "function": "",
+            "line": 200,
+            "pos": 16,
+            "scriptline": 198,
+            "scripthash": "d7069063759edbf2dcf45741802bc405"
+          },
+          "arguments": []
+        }
+      ]
+    }
+  ]
+}

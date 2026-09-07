@@ -67,9 +67,11 @@ public class TaintInfoStore {
     }
 
     public void deserializeAndAddTaintInfo(String s) {
-        TaintInfo info = TaintDeserializer.deserializeTaintInfo(s);
-        if (info != null) {
-            addTaintInfo(info);
+        List<TaintInfo> taintInfos = TaintDeserializer.deserializeAllTaintInfo(s);
+        for (TaintInfo info : taintInfos) {
+            if (info != null) {
+                addTaintInfo(info);
+            }
         }
     }
 }
